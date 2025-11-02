@@ -1,10 +1,14 @@
 package com.springqprobackend.springqpro.runtime;
 
+import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.service.QueueService;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
+import com.springqprobackend.springqpro.interfaces.TaskHandler;
+
 import java.util.Random;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,10 +21,13 @@ public class Worker implements Runnable {
     /* NOTE-TO-SELF: Remember, Java is pass-by-value BUT for objects that value is the reference itself.
     "queue" will point to the same Queue instantiated elsewhere (references point to the same location in the memory heap). */
 
+    private final TaskHandlerRegistry handlerRegistry;
+
     // Constructor:
-    public Worker(Task task, QueueService queue) {
+    public Worker(Task task, QueueService queue, TaskHandlerRegistry handlerRegistry) {
         this.task = task;
         this.queue = queue;
+        this.handlerRegistry = handlerRegistry;
     }
 
     // "run" will basically be this project's version of GoQueue's StartWorker():
@@ -31,7 +38,21 @@ public class Worker implements Runnable {
             task.setStatus(TaskStatus.INPROGRESS);
             System.out.printf("[Worker] Processing task %s (Attempt %d, Type: %s)%n", task.getId(), task.getAttempts(), task.getType());
 
-            handleTaskType(task);  // Verbose logic in my worker.go file can just be ported to a helper method for cleanliness.
+            System.out.println("DEBUG: GOING TO USE TaskHandler NOW INSTEAD OF THE SWITCH-CASE I ORIGINALLY HAD!!!");
+
+            // Replacing the switch-case logic w/ this below:
+            TaskHandler handler = handlerRegistry.getHandler(task.getType().name());
+            if(handler == null) {
+                // DEBUG: For now, I'm going to just return error, but I **think** this should map to the miscHandler? Figure out after testing w/ Postman.
+                System.err.printf("No handler found for type %s%n", task.getType());
+                task.setStatus(TaskStatus.FAILED);
+                return;
+            }
+            handler.handle(task);
+
+            System.out.println("DEBUG: JUST USED THE TaskHandler INSTEAD OF THE SWITCH-CASE!!!");
+
+            //handleTaskType(task);  // Verbose logic in my worker.go file can just be ported to a helper method for cleanliness.
         } catch(Exception e) {
             System.err.printf("[Worker] Task %s failed due to error: %s%n", task.getId(), e.getMessage());
             task.setStatus(TaskStatus.FAILED);
@@ -65,7 +86,7 @@ public class Worker implements Runnable {
             t.setStatus(TaskStatus.FAILED);
             if (t.getAttempts() < t.getMaxRetries()) {
                 System.out.printf("[Worker] Task %s (Type: fail - 0.25 success rate on retry) failed! Retrying...%n", t.getId());
-                queue.enqueue(t);
+                queue.retry(t, 1000);
             } else {
                 System.out.printf("[Worker] Task %s (Type: fail - 0.25 success rate on retry) failed permanently!%n", t.getId());
             }
@@ -78,7 +99,7 @@ public class Worker implements Runnable {
         t.setStatus(TaskStatus.FAILED);
         if (t.getAttempts() < t.getMaxRetries()) {
             System.out.printf("[Worker] Task %s (Type: fail-absolute) failed! Retrying...%n", t.getId());
-            queue.enqueue(t);
+            queue.retry(t, 1000);
         } else {
             System.out.printf("[Worker] Task %s (Type: fail-absolute) failed permanently!%n", t.getId());
         }

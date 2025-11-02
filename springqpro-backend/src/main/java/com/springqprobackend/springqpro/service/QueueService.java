@@ -1,17 +1,20 @@
 package com.springqprobackend.springqpro.service;
 
+import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.runtime.Worker;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-/* NOTE:: Initially did not have the @Service annotation because I was injecting this as a @Bean in SpringQueueApplication.java,
+/* NOTE: Initially did not have the @Service annotation because I was injecting this as a @Bean in SpringQueueApplication.java,
 but as part of my ExecutorService Refactor, the @Bean has been removed so we should just have @Service here.
 */
 @Service
@@ -22,13 +25,34 @@ public class QueueService {
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
     private final Lock readLock = rwLock.readLock();
     private final Lock writeLock = rwLock.writeLock();
+    private final TaskHandlerRegistry handlerRegistry;
+
+    /* NOTE: In my Worker.java class, for each Job/Task-type handle function, I make the thread sleep for a certain amount of
+    time (ms) e.g., Thread.sleep(2000); primarily to simulate different types of work (mimicking different processing times). But,
+    they served a dual-purpose in preventing race conditions for re-enqueuing failed tasks. (I have both type "fail" and "fail-absolute"
+    sleep for 1 second on known to-fail runs, for fails that do succeed -- I sleep for 2 seconds). But I guess the problem there is that
+    it's only the Worker threads themselves running. So, there's a delay in the retry loop, but it only affects the thread itself instead
+    of the Queue Service that actually does the enqueue functionality.
+    -- This is a Recursive Enqueue Chain (each failed Worker enqueues its successor). For small recursive try counts, it's not a bit deal.
+    But the issue arises in Scheduler Congestion and Tight Retry Loops under edge conditions.
+    -- My Thread.sleep(...) statements rate limit my retries by processing time (making a natural backoff) so there is no immediate
+    risk of runaway recursion. But my retry timing coupling is tied to processing time instead of Queue policy, so it'd be better
+    to offload that retry scheduling into the Queue itself (good practice too because separation of concerns).
+    -- Now, the Worker is only responsible for deciding WHETHER to retry.
+    -- QueueService decides WHEN to retry.
+
+    That's the reason for the field below. Important to get used to decoupled architecture. (Also see new method "public void retry(...){...}").
+    NOTE: Going to keep my Thread.sleep(...); statements in Worker.java for now (also remember they served that first original purpose too).
+    */
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     // Constructor:
     // NOTE: Defining worker.count in the application.properties file (switch to YAML? I have no idea).
-    public QueueService(@Value("${worker.count}") int workerCount) {
+    public QueueService(@Value("${worker.count}") int workerCount, TaskHandlerRegistry handlerRegistry) {
         this.jobs = new ConcurrentHashMap<>();
         //this.lock = new ReentrantLock();
         this.executor = Executors.newFixedThreadPool(workerCount);
+        this.handlerRegistry = handlerRegistry;
     }
 
     // Methods:
@@ -38,7 +62,7 @@ public class QueueService {
         writeLock.lock();
         try {
             jobs.put(t.getId(), t); // GoQueue: q.jobs[t.ID] = &t;
-            executor.submit(new Worker(t, this));   // Submit an instance of a Worker to the ExecutorService (executor pool).
+            executor.submit(new Worker(t, this, handlerRegistry));   // Submit an instance of a Worker to the ExecutorService (executor pool).
         } finally {
             writeLock.unlock();
         }
@@ -117,6 +141,11 @@ public class QueueService {
             writeLock.unlock();
         }
         return res;
+    }
+
+    // 7. retry (see comment block above field "private final ScheduledExecutorService scheduler"):
+    public void retry(Task t, long delayMs) {
+        scheduler.schedule(() -> enqueue(t), delayMs, TimeUnit.MILLISECONDS);
     }
 
     // HELPER-METHOD(S): Might be helpful for monitoring endpoints if necessary...
