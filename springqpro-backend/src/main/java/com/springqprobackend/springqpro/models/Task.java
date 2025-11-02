@@ -1,23 +1,25 @@
 package com.springqprobackend.springqpro.models;
 
 import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.enums.TaskType;
 import java.util.Objects;
+import java.time.LocalDateTime;
 
 public class Task {
     // Fields:
     private String id;
     private String payload;
-    private String type;    // TO-DO:(?) I could change this to also be an enum like "status" (not sure how undefined/foreign request types are handled though).
+    private TaskType type;    // TO-DO:(?) I could change this to also be an enum like "status" (not sure how undefined/foreign request types are handled though).
     private TaskStatus status;
     private int attempts;
     private int maxRetries;
-    private String createdAt;   // TO-DO:(?) I format this with LocalDateTime. (I could change this to that type for better filtering and so on).
+    private LocalDateTime createdAt;   // TO-DO:(?) I format this with LocalDateTime. (I could change this to that type for better filtering and so on).
 
     // Constructor(s):
     // no-args Constructor - for potential frameworks like Jackson/JPA (that may serialize/deserialize the object):
     public Task() {}
     // Main Constructor:
-    public Task(String id, String payload, String type, TaskStatus status, int attempts, int maxRetries, String createdAt) {
+    public Task(String id, String payload, TaskType type, TaskStatus status, int attempts, int maxRetries, LocalDateTime createdAt) {
         this.id = id;
         this.payload = payload;
         this.type = type;
@@ -34,7 +36,7 @@ public class Task {
     public String getPayload() {
         return payload;
     }
-    public String getType() {
+    public TaskType getType() {
         return type;
     }
     public TaskStatus getStatus() {
@@ -47,7 +49,7 @@ public class Task {
         return maxRetries;
     }
     public String getCreatedAt() {
-        return createdAt;
+        return createdAt.toString();
     }
 
     // Setter methods:
@@ -57,7 +59,7 @@ public class Task {
     public void setPayload(String payload) {
         this.payload = payload;
     }
-    public void setType(String type) {
+    public void setType(TaskType type) {
         this.type = type;
     }
     public void setStatus(TaskStatus status) {
@@ -69,7 +71,7 @@ public class Task {
     public void setMaxRetries(int maxRetries) {
         this.maxRetries = maxRetries;
     }
-    public void setCreatedAt(String createdAt) {
+    public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
 

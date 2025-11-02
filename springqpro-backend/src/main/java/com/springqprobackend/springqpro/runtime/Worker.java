@@ -3,7 +3,11 @@ package com.springqprobackend.springqpro.runtime;
 import com.springqprobackend.springqpro.service.QueueService;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.enums.TaskType;
 import java.util.Random;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Worker implements Runnable {
     // Fields:
@@ -37,14 +41,14 @@ public class Worker implements Runnable {
     // NOTE-TO-SELF: Remember to use "private void" for methods I just want to call from the class' public methods...
     private void handleTaskType(Task t) throws InterruptedException {
         switch(t.getType()) {
-            case "fail" -> handleFailType(t);
-            case "fail-absolute" -> handleAbsoluteFail(t);
-            case "email" -> simulateWork(t, 2000, "email");
-            case "report" -> simulateWork(t, 5000, "report");
-            case "data-cleanup" -> simulateWork(t, 3000, "data-cleanup");
-            case "sms" -> simulateWork(t, 1000, "sms");
-            case "newsletter" -> simulateWork(t, 4000, "newsletter");
-            case "takes-long" -> simulateWork(t, 10000, "takes-long");
+            case TaskType.FAIL -> handleFailType(t);
+            case TaskType.FAILABS -> handleAbsoluteFail(t);
+            case TaskType.EMAIL -> simulateWork(t, 2000, "email");
+            case TaskType.REPORT -> simulateWork(t, 5000, "report");
+            case TaskType.DATACLEANUP -> simulateWork(t, 3000, "data-cleanup");
+            case TaskType.SMS -> simulateWork(t, 1000, "sms");
+            case TaskType.NEWSLETTER -> simulateWork(t, 4000, "newsletter");
+            case TaskType.TAKESLONG -> simulateWork(t, 10000, "takes-long");
             default -> simulateWork(t, 2000, "undefined");
         }
     }

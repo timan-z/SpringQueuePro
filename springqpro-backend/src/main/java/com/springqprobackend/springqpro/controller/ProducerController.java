@@ -3,6 +3,7 @@ package com.springqprobackend.springqpro.controller;
 import com.springqprobackend.springqpro.service.QueueService;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.enums.TaskType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Arrays;
@@ -14,7 +15,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "${CORS_ALLOWED_ORIGIN}") // for Netlify/Railway CORS (also local dev) <-- this line alone should replace the CORS stuff I had in Producer.go
+//@CrossOrigin(origins = "${CORS_ALLOWED_ORIGIN}") // for Netlify/Railway CORS (also local dev) <-- this line alone should replace the CORS stuff I had in Producer.go
 public class ProducerController {
     private final QueueService queue;
 
@@ -29,13 +30,13 @@ public class ProducerController {
     // -- This is the DOT (Data Transfer Object).
     public static class EnqueueReq {
         public String payload;
-        public String type;
+        public TaskType type;
     }
 
     // 1. The equivalent of GoQueue's "http.HandleFunc("/api/enqueue", func(w http.ResponseWriter, r *http.Request) {...}" function:
     @PostMapping("/enqueue")
     public ResponseEntity<Map<String, String>> handleEnqueue(@RequestBody EnqueueReq req) {
-        String createdAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        LocalDateTime createdAt = LocalDateTime.now();//.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         Task t = new Task(
                 "Task-" + System.nanoTime(),
                 req.payload,
@@ -81,7 +82,7 @@ public class ProducerController {
                 TaskStatus.QUEUED,
                 0,
                 3,
-                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                LocalDateTime.now()//.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
         );
         queue.enqueue(tClone);
         return ResponseEntity.ok(tClone);

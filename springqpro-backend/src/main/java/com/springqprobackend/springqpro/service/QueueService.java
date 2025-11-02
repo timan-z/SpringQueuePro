@@ -4,11 +4,11 @@ import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.runtime.Worker;
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /* NOTE:: Initially did not have the @Service annotation because I was injecting this as a @Bean in SpringQueueApplication.java,
@@ -19,30 +19,28 @@ public class QueueService {
     // Fields:
     private final ExecutorService executor;
     private final ConcurrentHashMap<String,Task> jobs;
-    private final Lock lock;
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
-    private final ReentrantReadWriteLock.ReadLock readLock = rwLock.readLock();
+    private final Lock readLock = rwLock.readLock();
+    private final Lock writeLock = rwLock.writeLock();
 
     // Constructor:
-    public QueueService() {
+    // NOTE: Defining worker.count in the application.properties file (switch to YAML? I have no idea).
+    public QueueService(@Value("${worker.count}") int workerCount) {
         this.jobs = new ConcurrentHashMap<>();
-        this.lock = new ReentrantLock();
-        this.executor = Executors.newFixedThreadPool(3);
+        //this.lock = new ReentrantLock();
+        this.executor = Executors.newFixedThreadPool(workerCount);
     }
 
     // Methods:
     // 1. Translating GoQueue's "func (q * Queue) Enqueue(t task.Task) {...}" function:
     public void enqueue(Task t) {
         t.setStatus(TaskStatus.QUEUED);
-        if(t.getAttempts() == 0) {
-            t.setMaxRetries(3);
-        }
-        lock.lock();
+        writeLock.lock();
         try {
             jobs.put(t.getId(), t); // GoQueue: q.jobs[t.ID] = &t;
             executor.submit(new Worker(t, this));   // Submit an instance of a Worker to the ExecutorService (executor pool).
         } finally {
-            lock.unlock();
+            writeLock.unlock();
         }
     }
 
@@ -57,7 +55,7 @@ public class QueueService {
     // 2. Translating GoQueue's "func (q * Queue) Clear() {...}" function:
     // (This is the method for "emptying the queue").
     public void clear() {
-        lock.lock();
+        writeLock.lock();
         try {
             jobs.clear();
             //tasks.clear();
@@ -67,7 +65,7 @@ public class QueueService {
             internal .clear() function does the work better for me AND there's potential for the thread to block
             indefinitely w/ .take(); (that's also why this function initially needed a catch (InterruptedException e) {...} block. */
         } finally {
-            lock.unlock();
+            writeLock.unlock();
         }
     }
 
@@ -108,7 +106,7 @@ public class QueueService {
     // 6. Translating GoQueue's "func (q * Queue) DeleteJob(id string) bool" function:
     // This is the method for deleting a specific Job (Task) by ID:
     public boolean deleteJob(String id) {
-        lock.lock();
+        writeLock.lock();
         boolean res = false;
         try {
             if(jobs.containsKey(id)) {
@@ -116,7 +114,7 @@ public class QueueService {
                 res = true;
             }
         } finally {
-            lock.unlock();
+            writeLock.unlock();
         }
         return res;
     }

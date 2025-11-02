@@ -8,6 +8,7 @@ class SpringQueueProApplicationTests {
 
 	@Test
 	void contextLoads() {
+        System.out.println("I'm testing this file right now. What's all this then?");
 	}
 
 }
