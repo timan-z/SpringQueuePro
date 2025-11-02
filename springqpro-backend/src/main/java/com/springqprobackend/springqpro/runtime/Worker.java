@@ -42,12 +42,12 @@ public class Worker implements Runnable {
 
             // Replacing the switch-case logic w/ this below:
             TaskHandler handler = handlerRegistry.getHandler(task.getType().name());
-            if(handler == null) {
+            /*if(handler == null) {
                 // DEBUG: For now, I'm going to just return error, but I **think** this should map to the miscHandler? Figure out after testing w/ Postman.
                 System.err.printf("No handler found for type %s%n", task.getType());
                 task.setStatus(TaskStatus.FAILED);
                 return;
-            }
+            }*/
             handler.handle(task);
 
             System.out.println("DEBUG: JUST USED THE TaskHandler INSTEAD OF THE SWITCH-CASE!!!");

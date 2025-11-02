@@ -8,5 +8,6 @@ public enum TaskType {
     NEWSLETTER,
     TAKESLONG,
     FAIL,
-    FAILABS
+    FAILABS,
+    TEST
 }

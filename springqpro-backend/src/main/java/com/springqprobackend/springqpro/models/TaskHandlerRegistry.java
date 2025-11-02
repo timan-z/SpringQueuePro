@@ -28,7 +28,8 @@ public class TaskHandlerRegistry {
         this.handlers = handlers;
     }
     public TaskHandler getHandler(String type) {
-        return handlers.get(type);
+        //return handlers.get(type);
+        return handlers.getOrDefault(type, handlers.get("DEFAULT"));    // <-- DEBUG: TO HANDLE MISC / UNRECOGNIZED JOB/TASK TYPES.
     }
     public Map<String, TaskHandler> getAllHandlers() {
         return handlers;

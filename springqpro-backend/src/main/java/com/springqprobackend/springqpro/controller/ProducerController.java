@@ -36,7 +36,9 @@ public class ProducerController {
     // 1. The equivalent of GoQueue's "http.HandleFunc("/api/enqueue", func(w http.ResponseWriter, r *http.Request) {...}" function:
     @PostMapping("/enqueue")
     public ResponseEntity<Map<String, String>> handleEnqueue(@RequestBody EnqueueReq req) {
-        LocalDateTime createdAt = LocalDateTime.now();//.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        if(req.type == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Task type is required."));
+        }
         Task t = new Task(
                 "Task-" + System.nanoTime(),
                 req.payload,
@@ -44,7 +46,7 @@ public class ProducerController {
                 TaskStatus.QUEUED,
                 0,
                 3,
-                createdAt
+                LocalDateTime.now()
         );
         queue.enqueue(t);
         return ResponseEntity.ok(Map.of("message", String.format("Job %s (Payload: %s, Type: %s) enqueued!", t.getId(), t.getPayload(), t.getType())));
