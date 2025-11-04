@@ -129,6 +129,10 @@ public class QueueService {
 
     // 7. retry (see comment block above field "private final ScheduledExecutorService scheduler"):
     public void retry(Task t, long delayMs) {
+        if(t.getStatus() != TaskStatus.FAILED) {
+            System.out.printf("[QueueService] Retry request for Task %s (non-FAILED Task) rejected!%n", t.getId());
+            return;
+        }
         scheduler.schedule(() -> enqueue(t), delayMs, TimeUnit.MILLISECONDS);
     }
 
