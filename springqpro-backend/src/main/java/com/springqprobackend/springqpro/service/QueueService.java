@@ -60,19 +60,11 @@ public class QueueService {
         writeLock.lock();
         try {
             jobs.put(t.getId(), t); // GoQueue: q.jobs[t.ID] = &t;
-            executor.submit(new Worker(t, this, handlerRegistry));   // Submit an instance of a Worker to the ExecutorService (executor pool).
+            executor.submit(new Worker(t, handlerRegistry));   // Submit an instance of a Worker to the ExecutorService (executor pool).
         } finally {
             writeLock.unlock();
         }
     }
-
-    /* NOTE: With the incorporation of ExecutorService, GoQueue's "func (q * Queue) Dequeue() * task.Task {...}" function is no longer
-    necessary given that ExecutorService handles queuing internally. (That means I don't need to manage that myself anymore). */
-    // 2. Translating GoQueue's "func (q * Queue) Dequeue() * task.Task {...}" function:
-    /*public Task dequeue() throws InterruptedException {
-        return tasks.take();    // "Blocks if the queue is still empty until an element becomes available."
-    }
-    */
 
     // 2. Translating GoQueue's "func (q * Queue) Clear() {...}" function:
     // (This is the method for "emptying the queue").
@@ -80,12 +72,6 @@ public class QueueService {
         writeLock.lock();
         try {
             jobs.clear();
-            //tasks.clear();
-            /* NOTE: ^ In my queue.go file, instead of tasks.clear(); I used a loop that would iterate while
-            tasks wasn't empty and repeatedly pull values out of the Queue per iteration. I did that initially
-            here w/ while(!tasks.isEmpty()) { tasks.take(); }. But it's not necessary here since the Queue's
-            internal .clear() function does the work better for me AND there's potential for the thread to block
-            indefinitely w/ .take(); (that's also why this function initially needed a catch (InterruptedException e) {...} block. */
         } finally {
             writeLock.unlock();
         }
