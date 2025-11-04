@@ -12,6 +12,10 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,12 +26,45 @@ import static org.mockito.Mockito.*;
 */
 // remember to scan back after and put any code that's mimicked across all tests in the @BeforeEach method!
 
+/* Some other tests I can maybe write that aren't super high priority:
+- Double enqueue prevention (code should reject duplicate IDs -- actually don't know if that's in the code).
+- Max retry logic (task doesn’t re-enqueue beyond maxAttempts).
+- Shutdown behavior (test service gracefully stops workers when needed).
+- HandlerRegistry fallback — test that when no handler exists, the default handler runs.
+*/
+
 @ExtendWith(MockitoExtension.class)
 public class QueueServiceTests {
+
+    /* NOTE: Called DirectExecutorServiec because it runs commands immediately within the same thread
+    (so I don't need to hassle with sleeps, race conditions, and all the concurrency-related headaches in testing). */
+    private static class DirectExecutorService extends AbstractExecutorService {
+        @Override public void shutdown() {}
+        @Override public List<Runnable> shutdownNow() { return Collections.emptyList(); }
+        @Override public boolean isShutdown() { return false; }
+        @Override public boolean isTerminated() { return false; }
+        @Override public boolean awaitTermination(long timeout, TimeUnit unity) { return true; }
+        @Override
+        public void execute(Runnable command) {
+            /* Runs immediately in the calling thread. This is all that we're interested in using.
+            The whole purpose of this nested private class definition is so we can run this function.
+            (I'm using an ExecutorService in QueueService which is an extension of the Executor service.
+            Ideally, I would have just done Executor ... = Runnable::run, but you can't do that
+            w/ ExecutorService because it extends Executor and implements additional methods, so we have
+            to implement them above (just the stubs) so we can run that. */
+            /* NOTE: It's apparently best practice to inject an Executor for testing w/o sleeps or leniency stubs.
+            (It's ideal to do that when testing systems where concurrency is involved, like this one). */
+            command.run();  // runs immediately in the calling thread. This is all we're interested in
+        }
+    }
+
     @Mock
     private TaskHandlerRegistry handlerRegistry;
+    @Mock
+    private ExecutorService mockExecutor;
 
     private QueueService queue;
+    private Task t;
 
     /* NOTE: I can't do @InjectMocks over private QueueService queue; because the constructor arg list for my QueueService class
     looks like this: (@Value("${worker.count}") int workerCount, TaskHandlerRegistry handlerRegistry) and Mockito cannot autowire
@@ -41,20 +78,24 @@ public class QueueServiceTests {
     The MockitoAnnotations line can be automated and omitted w/ @ExtendWith(MockitoExtension.class) */
     @BeforeEach
     void setUp() {
-        queue = new QueueService(2, handlerRegistry);   // Manually constructing the queue (which is why there's no annotation above it earlier).
+        ExecutorService immediateExecutor = new DirectExecutorService();
+        queue = new QueueService(immediateExecutor, handlerRegistry);   // Manually constructing the queue (which is why there's no annotation above it earlier).
+        // Init Task w/ no-args constructor:
+        t = new Task();
+        // id and type fields are the ubiquitous fields for testing (e.g., for identification):
+        t.setId("Task-ArbitraryTestId");
+        t.setType(TaskType.EMAIL);
     }
 
     @Test
     void enqueue_shouldAddTask_toJobsMap() {
-        // Init Task w/ no-args constructor (just checking to make sure it appears in the jobs map with correct details).
-        Task t = new Task();
-        // Only the id and type fields are truly necessary for identification and status checking:
-        t.setId("Task-ArbitraryTestId");
-        t.setType(TaskType.EMAIL);
         // DEBUG:+NOTE: No type field causes error I'm pretty sure. Not sure about id though (maybe it should -- come back and look into this later).
         queue.enqueue(t);
-
-        assertEquals(TaskStatus.QUEUED, t.getStatus()); // <-- DEBUG: Not 100% sure about this check...? (t's type set to QUEUED happens inside enqueue(...). Does this exceute sequentially?
+        /* EDIT: So it checks for FAILED before for a reason. We don't really care about what the Worker/Executor actually does, I just want to
+        make sure that this Task gets enqueued into the pool and added to the jobs map (and so on). It will FAIL because I'm now relying on the
+        direct executor that I define in the nested class. So even if I have a when...thenReturn(); call somewhere, it won't work. But that's okay
+        because that's not really the concern of this Test. (I could just not use the direct executor if this were something I were actually concerned about). */
+        assertEquals(TaskStatus.FAILED, t.getStatus());
         assertEquals(1, queue.getJobMapCount());    // Each test runs in isolation, so 1 job w/ only one task queued.
         assertNotNull(queue.getJobById("Task-ArbitraryTestId"));
         /* NOTE: Tasks of Type EMAIL take ~2 seconds to finish execution (after which, their Type becomes COMPLETED).
@@ -65,10 +106,6 @@ public class QueueServiceTests {
 
     @Test
     void clear_shouldEmpty_theJobsMap() {
-        // Init Task w/ no-args constructor:
-        Task t = new Task();
-        t.setId("Task-ArbitraryTestId");
-        t.setType(TaskType.EMAIL);
         queue.enqueue(t);   // enqueue this job just so that the clear method can be invoked.
 
         // DEBUG: Not sure if this would work honestly. Get some clarity on if the execution of this test would be sequential (it should be right? Why am I questioning this?)
@@ -78,11 +115,20 @@ public class QueueServiceTests {
     }
 
     @Test
-    void delete_shouldRemoveJob_fromJobsMap() {
-        // Init Task w/ no-args constructor:
-        Task t = new Task();
-        t.setId("Task-ArbitraryTestId");
+    void jobsMap_canMap_manyJobs() {
+        // t is declared in @BeforeEach method
+        Task t2 = new Task();
+        t2.setId("Task-ArbitraryTestId2");
         t.setType(TaskType.EMAIL);
+        queue.enqueue(t);
+        queue.enqueue(t2);
+        assertEquals(2, queue.getJobMapCount());
+        assertNotNull(queue.getJobById("Task-ArbitraryTestId"));
+        assertNotNull(queue.getJobById("Task-ArbitraryTestId2"));
+    }
+
+    @Test
+    void delete_shouldRemoveJob_fromJobsMap() {
         queue.enqueue(t);
 
         queue.deleteJob("Task-ArbitraryTestId");
@@ -92,11 +138,7 @@ public class QueueServiceTests {
 
     @Test
     void retry_shouldEnqueue_failedTask() throws InterruptedException {
-        // Init Task w/ no-args constructor:
-        Task t = new Task();
-        t.setId("Task-ArbitraryTestId");
-        t.setType(TaskType.EMAIL);
-        t.setStatus(TaskStatus.FAILED);
+        t.setStatus(TaskStatus.FAILED); // Append to t.
         /* NOTE: Originally had the when...thenReturn(...); function definition below in the @Test methods above too,
         but they would invoke unused stubbing errors when you'd attempt to run the tests. That's because the enqueue function
         is asynchronous (or rather async up until the task is enqueued into the executorService, but the test finishes almost
@@ -125,15 +167,55 @@ public class QueueServiceTests {
 
     @Test
     void retry_shouldReject_nonFailedTask() {
-        Task t = new Task();
-        t.setId("Task-ArbitraryTestId");
-        t.setType(TaskType.EMAIL);
         t.setStatus(TaskStatus.COMPLETED);  // .retry(...) should reject tasks/jobs of status non-FAILED.
         queue.retry(t, 10);
         // I think we can omit the TimeUnit...sleep and when...thenReturn because we're expecting auto-rejection.
 
         assertNull(queue.getJobById("Task-ArbitraryTestId"));
         assertEquals(0, queue.getJobMapCount());
+    }
+
+    /* NOTE: I also want to test for my ExecutorService field in QueueService is it properly shutting down.
+    (Making sure that @PreDestroy, shutdown() methods etc correctly terminate the executor).
+    But that's trickier since ExecutorService *is* an internal field. So I'll have to add that as a @Mock field here.
+    Here's what we'd be testing directly:
+    1. When shutdown() is called, it invokes executor.shutdown();
+    2. If the executor doesn't terminate in time, it calls executor.shutdownNow();
+    3. It handles InterruptedException correctly (interrupts the current thread and calls shutdownNow()). */
+    // 1.
+    @Test
+    void shutdown_shouldTerminateExecutorService() throws InterruptedException {
+        when(mockExecutor.awaitTermination(anyLong(), any())).thenReturn(true);
+        QueueService queueService = new QueueService(mockExecutor, handlerRegistry);
+        queueService.shutdown();    // voila.
+
+        verify(mockExecutor).shutdown();
+        verify(mockExecutor).awaitTermination(5, TimeUnit.SECONDS);
+        verify(mockExecutor, never()).shutdownNow();
+    }
+    // 2.
+    @Test
+    void shutdown_shouldTerminate_ifTimeoutOccurs() throws InterruptedException {
+        when(mockExecutor.awaitTermination(anyLong(), any())).thenReturn(false); // simulate timeout.
+        QueueService service = new QueueService(mockExecutor, handlerRegistry);
+        service.shutdown();
+
+        verify(mockExecutor).shutdown();
+        verify(mockExecutor).awaitTermination(5, TimeUnit.SECONDS);
+        verify(mockExecutor).shutdownNow();  // force shutdown should trigger.
+    }
+    // 3.
+    @Test
+    void shutdown_shouldForceTerminate_ifInterrupted() throws InterruptedException {
+        when(mockExecutor.awaitTermination(anyLong(), any())).thenThrow(new InterruptedException("simulated interruption"));
+
+        QueueService service = new QueueService(mockExecutor, handlerRegistry);
+        service.shutdown();
+
+        verify(mockExecutor).shutdown();
+        verify(mockExecutor).shutdownNow();
+        // Verify that the thread was interrupted again
+        assertTrue(Thread.interrupted(), "Current thread should be re-interrupted after catching InterruptedException");
     }
 
 }

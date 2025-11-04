@@ -53,6 +53,13 @@ public class QueueService {
         this.handlerRegistry = handlerRegistry;
     }
 
+    // Constructor 2 (specifically for JUnit+Mockito testing purposes, maybe custom setups too I suppose):
+    public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry){
+        this.executor = executor;
+        this.handlerRegistry = handlerRegistry;
+        this.jobs = new ConcurrentHashMap<>();
+    }
+
     // Methods:
     // 1. Translating GoQueue's "func (q * Queue) Enqueue(t task.Task) {...}" function:
     public void enqueue(Task t) {
