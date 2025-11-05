@@ -1,13 +1,17 @@
 package com.springqprobackend.springqpro.service;
 
+import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.runtime.Worker;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -45,8 +49,9 @@ public class QueueService {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     // Constructor:
+
     // NOTE: Defining worker.count in the application.properties file (switch to YAML? I have no idea).
-    public QueueService(@Value("${worker.count}") int workerCount, TaskHandlerRegistry handlerRegistry) {
+    public QueueService(@Value("${worker.count}") int workerCount, @Lazy TaskHandlerRegistry handlerRegistry) {
         this.jobs = new ConcurrentHashMap<>();
         //this.lock = new ReentrantLock();
         this.executor = Executors.newFixedThreadPool(workerCount);
@@ -54,7 +59,7 @@ public class QueueService {
     }
 
     // Constructor 2 (specifically for JUnit+Mockito testing purposes, maybe custom setups too I suppose):
-    public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry){
+    public QueueService(ExecutorService executor, @Lazy TaskHandlerRegistry handlerRegistry){
         this.executor = executor;
         this.handlerRegistry = handlerRegistry;
         this.jobs = new ConcurrentHashMap<>();

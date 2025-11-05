@@ -5,14 +5,40 @@ import com.springqprobackend.springqpro.enums.TaskType;
 import java.util.Objects;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.validation.constraints.*;
+
+/* NOTE:+2025-11-05-EDIT: I'm going to be adding Validation Annotations (Bean Validation) to this file.
+The purpose is to basically guard against malformed input (primarily those received at Controller endpoints).
+-- Controller endpoints would be marked with @Valid annotations on the @RequestBody (so stuff w/ NULL values, and so on, would be rejected ASAP).
+-- My existing GlobalExceptionHandler can catch MethodArgumentNotValidException errors and return clean 400s with field-specific error messages.
+IMPORTANT-NOTE: These validations won't auto-validate by themselves (like I can still create new Task(); without providing arguments and
+everything would be fine. Validation happens when you explicitly call a Validator or if Spring MVC auto triggers validation with
+like @Valid on a @RequestBody argument (the latter is more what I would be working with).
+*/
+// NOTE: ^ With these inclusions, GlobalExceptionHandler.java can be updated to handle Validation errors also (hence the "message"s).
+
+@JsonInclude(JsonInclude.Include.NON_NULL)  // This annotation basically says no NULL fields allowed in JSON responses.
 public class Task {
     // Fields:
+    @NotBlank(message="Task ID cannot be blank.")
     private String id;
+
+    @NotBlank(message="Payload cannot be blank.")   // DEBUG: At least for now? Maybe there's some that could? I don't know.
+    @Size(max = 1000, message="Payload should not exceed 1000 characters.") // DEBUG: I think that's a good limit? Adjust later.
     private String payload;
+
+    @NotNull(message="Task Type cannot be NULL.")
     private TaskType type;    // TO-DO:(?) I could change this to also be an enum like "status" (not sure how undefined/foreign request types are handled though).
+    @NotNull(message="Task Status cannot be NULL.") // <-- DEBUG: At least, I'm pretty sure.
     private TaskStatus status;
+
+    @Min(value = 0, message="Attempts must be a non-negative integer value.")
     private int attempts;
+    @Min(value = 0, message="Max retries must be a non-negative integer value.")
     private int maxRetries;
+
+    @PastOrPresent(message="Creation Time Stamp cannot be in the future.")
     private LocalDateTime createdAt;   // TO-DO:(?) I format this with LocalDateTime. (I could change this to that type for better filtering and so on).
 
     // Constructor(s):

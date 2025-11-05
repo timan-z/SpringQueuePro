@@ -4,6 +4,7 @@ import com.springqprobackend.springqpro.service.QueueService;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Arrays;
@@ -34,7 +35,7 @@ public class ProducerController {
 
     // 1. The equivalent of GoQueue's "http.HandleFunc("/api/enqueue", func(w http.ResponseWriter, r *http.Request) {...}" function:
     @PostMapping("/enqueue")
-    public ResponseEntity<Map<String, String>> handleEnqueue(@RequestBody EnqueueReq req) {
+    public ResponseEntity<Map<String, String>> handleEnqueue(@Valid @RequestBody EnqueueReq req) {
         if(req.type == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Task type is required."));
         }
