@@ -13,20 +13,26 @@ import java.util.Random;
 public class FailHandler implements TaskHandler {
     // Field
     private final QueueService queue;
-
     private final Sleeper sleeper;
+    private final Random random;
 
     public FailHandler(@Lazy QueueService queue, Sleeper sleeper) {
         this.queue = queue;
         this.sleeper = sleeper;
+        this.random = new Random(); // This is the constructor called by Worker.java, it just uses default Random init.
+    }
+
+    // This is the for-testing constructor where random is provided by user (to control testing outcomes, see: FailHandlerTests.java):
+    public FailHandler(@Lazy QueueService queue, Sleeper sleeper, Random random) {
+        this.queue = queue;
+        this.sleeper = sleeper;
+        this.random = random;
     }
 
     @Override
     public void handle(Task task) throws InterruptedException {
-        Random rando = new Random();
         double successChance = 0.25;
-        if(rando.nextDouble() <= successChance) {
-            //Thread.sleep(2000);
+        if(random.nextDouble() <= successChance) {
             sleeper.sleep(2000);
             task.setStatus(TaskStatus.COMPLETED);
             System.out.printf("[Worker] Task %s (Type: fail - 0.25 success rate on retry) completed%n", task.getId());
@@ -35,9 +41,7 @@ public class FailHandler implements TaskHandler {
             if (task.getAttempts() < task.getMaxRetries()) {
                 System.out.printf("[Worker] Task %s (Type: fail - 0.25 success rate on retry) failed! Retrying...%n", task.getId());
                 queue.retry(task, 1000);
-                //queue.enqueue(t);
             } else {
-                //Thread.sleep(1000);
                 sleeper.sleep(1000);
                 System.out.printf("[Worker] Task %s (Type: fail - 0.25 success rate on retry) failed permanently!%n", task.getId());
             }
