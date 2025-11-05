@@ -5,6 +5,7 @@ import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.service.QueueService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import java.util.Random;
@@ -16,6 +17,7 @@ public class FailHandler implements TaskHandler {
     private final Sleeper sleeper;
     private final Random random;
 
+    @Autowired
     public FailHandler(@Lazy QueueService queue, Sleeper sleeper) {
         this.queue = queue;
         this.sleeper = sleeper;

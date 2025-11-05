@@ -6,6 +6,7 @@ import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.runtime.Worker;
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -51,7 +52,9 @@ public class QueueService {
     // Constructor:
 
     // NOTE: Defining worker.count in the application.properties file (switch to YAML? I have no idea).
-    public QueueService(@Value("${worker.count}") int workerCount, @Lazy TaskHandlerRegistry handlerRegistry) {
+    // DEBUG: Temp removing @Lazy from infront of TaskHandlerRegistry handlerRegistry (see if that's okay)
+    @Autowired  // DEBUG: See if this fixes the issue!
+    public QueueService(@Value("${worker.count}") int workerCount, TaskHandlerRegistry handlerRegistry) {
         this.jobs = new ConcurrentHashMap<>();
         //this.lock = new ReentrantLock();
         this.executor = Executors.newFixedThreadPool(workerCount);
@@ -59,7 +62,8 @@ public class QueueService {
     }
 
     // Constructor 2 (specifically for JUnit+Mockito testing purposes, maybe custom setups too I suppose):
-    public QueueService(ExecutorService executor, @Lazy TaskHandlerRegistry handlerRegistry){
+    // DEBUG: Temp removing @Lazy from infront of TaskHandlerRegistry handlerRegistry (see if that's okay)
+    public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry){
         this.executor = executor;
         this.handlerRegistry = handlerRegistry;
         this.jobs = new ConcurrentHashMap<>();
