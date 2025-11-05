@@ -17,7 +17,6 @@ a Spring-managed collection of beans, not something to instantiate).
 
 @Component
 public class TaskHandlerRegistry {
-
     /* This new field added below relates to my move away from the switch-case handling of jobs/tasks based on type
     and towards handling them using external classes that implement an interface that'll be managed by this map below: */
 

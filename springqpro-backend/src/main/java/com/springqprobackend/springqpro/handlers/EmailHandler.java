@@ -1,6 +1,7 @@
 package com.springqprobackend.springqpro.handlers;
 
 import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 
@@ -8,9 +9,16 @@ import org.springframework.stereotype.Component;
 
 @Component("EMAIL")
 public class EmailHandler implements TaskHandler {
+    private final Sleeper sleeper;
+
+    public EmailHandler(Sleeper sleeper) {
+        this.sleeper = sleeper;
+    }
+
     @Override
     public void handle(Task task) throws InterruptedException {
-        Thread.sleep(2000);
+        //Thread.sleep(2000);
+        sleeper.sleep(2000);
         task.setStatus(TaskStatus.COMPLETED);
         System.out.printf("[Worker] Task %s (Type: %s) completed%n", task.getId(), task.getType());
     }

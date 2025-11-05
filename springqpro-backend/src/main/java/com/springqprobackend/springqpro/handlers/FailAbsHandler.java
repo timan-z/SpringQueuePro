@@ -1,6 +1,7 @@
 package com.springqprobackend.springqpro.handlers;
 
 import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.service.QueueService;
@@ -12,9 +13,11 @@ import org.springframework.stereotype.Component;
 public class FailAbsHandler implements TaskHandler {
     // Field
     private final QueueService queue;
+    private final Sleeper sleeper;
 
-    public FailAbsHandler(@Lazy QueueService queue) {
+    public FailAbsHandler(@Lazy QueueService queue, Sleeper sleeper) {
         this.queue = queue;
+        this.sleeper = sleeper;
     }
 
     @Override
@@ -24,7 +27,8 @@ public class FailAbsHandler implements TaskHandler {
             System.out.printf("[Worker] Task %s (Type: fail-absolute) failed! Retrying...%n", task.getId());
             queue.retry(task, 1000);
         } else {
-            Thread.sleep(1000);
+            //Thread.sleep(1000);
+            sleeper.sleep(1000);
             System.out.printf("[Worker] Task %s (Type: fail-absolute) failed permanently!%n", task.getId());
         }
     }
