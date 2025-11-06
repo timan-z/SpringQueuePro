@@ -5,14 +5,12 @@ import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.runtime.Worker;
-import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
-import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import jakarta.annotation.PreDestroy;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -23,6 +21,7 @@ but as part of my ExecutorService Refactor, the @Bean has been removed so we sho
 @Service
 public class QueueService {
     // Fields:
+    private static final Logger logger = LoggerFactory.getLogger(QueueService.class);
     private final ExecutorService executor;
     private final ConcurrentHashMap<String,Task> jobs;
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
@@ -146,7 +145,7 @@ public class QueueService {
     // 7. retry (see comment block above field "private final ScheduledExecutorService scheduler"):
     public void retry(Task t, long delayMs) {
         if(t.getStatus() != TaskStatus.FAILED) {
-            System.out.printf("[QueueService] Retry request for Task %s (non-FAILED Task) rejected!%n", t.getId());
+            logger.info("[QueueService] Retry request for Task {} (non-FAILED Task) rejected!", t.getId());
             return;
         }
         scheduler.schedule(() -> enqueue(t), delayMs, TimeUnit.MILLISECONDS);

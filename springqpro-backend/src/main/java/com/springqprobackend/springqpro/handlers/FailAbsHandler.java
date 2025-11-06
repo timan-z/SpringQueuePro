@@ -6,12 +6,15 @@ import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.service.QueueService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 @Component("FAILABS")
 public class FailAbsHandler implements TaskHandler {
     // Field
+    private static final Logger logger = LoggerFactory.getLogger(FailAbsHandler.class);
     private final QueueService queue;
     private final Sleeper sleeper;
 
@@ -24,12 +27,11 @@ public class FailAbsHandler implements TaskHandler {
     public void handle(Task task) throws InterruptedException {
         task.setStatus(TaskStatus.FAILED);
         if (task.getAttempts() < task.getMaxRetries()) {
-            System.out.printf("[Worker] Task %s (Type: fail-absolute) failed! Retrying...%n", task.getId());
+            logger.info("[Worker] Task {} (Type: FAILABS - Fail-Absolute) failed! Retrying...", task.getId());
             queue.retry(task, 1000);
         } else {
-            //Thread.sleep(1000);
             sleeper.sleep(1000);
-            System.out.printf("[Worker] Task %s (Type: fail-absolute) failed permanently!%n", task.getId());
+            logger.info("[Worker] Task {} (Type: FAILABS - Fail-Absolute) failed permanently!", task.getId());
         }
     }
 }

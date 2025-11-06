@@ -5,10 +5,13 @@ import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component("SMS")
 public class SmsHandler implements TaskHandler {
+    private static final Logger logger = LoggerFactory.getLogger(SmsHandler.class);
     private final Sleeper sleeper;
 
     public SmsHandler(Sleeper sleeper) {
@@ -19,6 +22,6 @@ public class SmsHandler implements TaskHandler {
     public void handle(Task task) throws InterruptedException {
         sleeper.sleep(1000);
         task.setStatus(TaskStatus.COMPLETED);
-        System.out.printf("[Worker] Task %s (Type: %s) completed%n", task.getId(), task.getType());
+        logger.info("[Worker] Task {} (Type: {}) completed", task.getId(), task.getType());
     }
 }

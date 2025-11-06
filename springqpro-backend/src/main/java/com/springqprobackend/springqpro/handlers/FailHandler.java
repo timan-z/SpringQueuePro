@@ -5,6 +5,8 @@ import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.service.QueueService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -13,6 +15,7 @@ import java.util.Random;
 @Component("FAIL")
 public class FailHandler implements TaskHandler {
     // Field
+    private static final Logger logger = LoggerFactory.getLogger(FailHandler.class);
     private final QueueService queue;
     private final Sleeper sleeper;
     private final Random random;
@@ -37,15 +40,15 @@ public class FailHandler implements TaskHandler {
         if(random.nextDouble() <= successChance) {
             sleeper.sleep(2000);
             task.setStatus(TaskStatus.COMPLETED);
-            System.out.printf("[Worker] Task %s (Type: fail - 0.25 success rate on retry) completed%n", task.getId());
+            logger.info("[Worker] Task {} (Type: FAIL - 0.25 success rate on retry) completed", task.getId());
         } else {
             task.setStatus(TaskStatus.FAILED);
             if (task.getAttempts() < task.getMaxRetries()) {
-                System.out.printf("[Worker] Task %s (Type: fail - 0.25 success rate on retry) failed! Retrying...%n", task.getId());
+                logger.warn("[Worker] Task {} (Type: FAIL - 0.25 success rate on retry) failed! Retrying...", task.getId());
                 queue.retry(task, 1000);
             } else {
                 sleeper.sleep(1000);
-                System.out.printf("[Worker] Task %s (Type: fail - 0.25 success rate on retry) failed permanently!%n", task.getId());
+                logger.error("[Worker] Task {} (Type: FAIL - 0.25 success rate on retry) failed permanently!", task.getId());
             }
         }
     }

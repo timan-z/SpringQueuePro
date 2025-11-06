@@ -4,10 +4,13 @@ import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component("DEFAULT")
 public class DefaultHandler implements TaskHandler {
+    private static final Logger logger = LoggerFactory.getLogger(DefaultHandler.class);
     private final Sleeper sleeper;
 
     public DefaultHandler(Sleeper sleeper) {
@@ -16,10 +19,10 @@ public class DefaultHandler implements TaskHandler {
 
     @Override
     public void handle(Task task) throws InterruptedException {
-        System.err.printf("[Worker] No specific handler found for type '%s'. Executing default behavior.%n", task.getType());
+        logger.info("[Worker] No specific handler found for type '{}'. Executing default behavior.", task.getType());
         //Thread.sleep(2000);
         sleeper.sleep(2000);
         task.setStatus(TaskStatus.COMPLETED);
-        System.out.printf("[Worker] Task %s (Type: %s) completed%n", task.getId(), task.getType());
+        logger.info("[Worker] Task {} (Type: {}) completed", task.getId(), task.getType());
     }
 }

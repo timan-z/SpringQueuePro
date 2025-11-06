@@ -5,6 +5,9 @@ import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Arrays;
@@ -29,11 +32,18 @@ public class ProducerController {
     // 0. My GoQueue project had a struct "type EnqueueReq struct {...}" in its producer.go file. This would be the equivalent:
     // -- This is the DOT (Data Transfer Object).
     public static class EnqueueReq {
+        @NotBlank(message="Payload cannot be blank.")
+        @Size(max = 1000, message="Payload should not exceed 1000 characters.")
         public String payload;
+        @NotNull(message="Task Type cannot be NULL.")
         public TaskType type;
     }
 
     // 1. The equivalent of GoQueue's "http.HandleFunc("/api/enqueue", func(w http.ResponseWriter, r *http.Request) {...}" function:
+    /* TO-DO:+NOTE: Should probably also make one where a Task itself is directly instantiated since I added Validation Annotations to that file...
+    -- I guess the problem is that the EnqueueReq one is already mapped to /enqueue? Or can I add another one for it?
+    -- Not super high priority right now. Come back to this later and figure something out...
+    * */
     @PostMapping("/enqueue")
     public ResponseEntity<Map<String, String>> handleEnqueue(@Valid @RequestBody EnqueueReq req) {
         if(req.type == null) {

@@ -30,7 +30,7 @@ public class Task {
 
     @NotNull(message="Task Type cannot be NULL.")
     private TaskType type;    // TO-DO:(?) I could change this to also be an enum like "status" (not sure how undefined/foreign request types are handled though).
-    @NotNull(message="Task Status cannot be NULL.") // <-- DEBUG: At least, I'm pretty sure.
+    //@NotNull(message="Task Status cannot be NULL.") // <-- DEBUG: At least, I'm pretty sure. (WAIT NO -- Worker is meant to set this!!!)
     private TaskStatus status;
 
     @Min(value = 0, message="Attempts must be a non-negative integer value.")
