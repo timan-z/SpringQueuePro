@@ -80,8 +80,8 @@ public class QueueServiceTests {
     @BeforeEach
     void setUp() {
         ExecutorService immediateExecutor = new DirectExecutorService();
-        when(props.getMainExecWorkerCount()).thenReturn(5);
-        when(props.getSchedExecWorkerCount()).thenReturn(1);
+        //when(props.getMainExecWorkerCount()).thenReturn(5);
+        //when(props.getSchedExecWorkerCount()).thenReturn(1);
         queue = new QueueService(immediateExecutor, handlerRegistry, props);   // Manually constructing the queue (which is why there's no annotation above it earlier).
         // Init Task w/ no-args constructor:
         t = new Task();

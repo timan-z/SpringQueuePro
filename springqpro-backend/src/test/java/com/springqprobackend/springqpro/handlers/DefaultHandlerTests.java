@@ -8,7 +8,9 @@ import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -18,6 +20,7 @@ import static org.mockito.Mockito.when;
 The variation you see in DefaultHandler mimicked across other Handlers w/ different sleep times.
 -- Picking DefaultHandler specifically since it's the *default* Handler I'll always have regardless of refactoring, etc.
 */
+@ExtendWith(MockitoExtension.class)
 public class DefaultHandlerTests {
     private Sleeper fastSleeper;
     private DefaultHandler handler;

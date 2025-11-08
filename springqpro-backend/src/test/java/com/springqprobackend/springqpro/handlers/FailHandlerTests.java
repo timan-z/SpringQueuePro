@@ -43,8 +43,8 @@ public class FailHandlerTests {
 
     @BeforeEach
     void setUp() {
-        when(props.getFailSleepTime()).thenReturn(1000L);
-        when(props.getFailSuccSleepTime()).thenReturn(2000L);
+        //when(props.getFailSleepTime()).thenReturn(1000L);
+        //when(props.getFailSuccSleepTime()).thenReturn(2000L);
         fastSleeper = millis -> {}; // Define functional interface implementation w/ Lambda. (Remember this).
         t = new Task();
         t.setId("Task-ArbitraryTastkId");
@@ -58,6 +58,7 @@ public class FailHandlerTests {
     void failHandler_completes_failedTask() throws InterruptedException {
         /* In my FailHandler.java class, I define successOdds as 0.25, so if I guarantee fixedRandom.nextDouble returns 0.1
         (which obv <= 0.25, so I'm in the % interval where my random odds succeeded), then I can let failHandler complete this task: */
+        when(props.getFailSuccSleepTime()).thenReturn(2000L);
         when(fixedRandom.nextDouble()).thenReturn(0.1);
         FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom, props);
 
@@ -70,6 +71,7 @@ public class FailHandlerTests {
     // This test case basically verifies that queue.retry(...) was called (when t.getAttempts() < t.getMaxRetries() and odds indicate no success).
     @Test
     void failHandler_retries_failedTask() throws InterruptedException {
+        when(props.getFailSleepTime()).thenReturn(1000L);
         when(fixedRandom.nextDouble()).thenReturn(0.9);
         // (Dunno if needed)DEBUG: when(queue.retry(any(Task.class),anyLong()).then???
         FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom, props);
@@ -83,6 +85,7 @@ public class FailHandlerTests {
     // This test case confirms that queue.retry(...) is not ran when (t.getAttempts >= t.getMaxRetries() and odds indicate no success).
     @Test
     void failHandler_retires_maxFailedTask() throws InterruptedException {
+        when(props.getFailSleepTime()).thenReturn(1000L);
         t.setAttempts(3);   // So, it goes straight to the failed if-condition branch.
         when(fixedRandom.nextDouble()).thenReturn(0.9);
         FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom, props);
@@ -95,6 +98,7 @@ public class FailHandlerTests {
     // Verify that the Sleeper.sleep(2000) call was invoked for a successful attempt:
     @Test
     void failHandler_callsSleep_onSuccess() throws InterruptedException {
+        when(props.getFailSuccSleepTime()).thenReturn(2000L);
         when(fixedRandom.nextDouble()).thenReturn(0.1);
         FailHandler failHandler = new FailHandler(queue, mockSleeper, fixedRandom, props);
         failHandler.handle(t);
@@ -103,6 +107,7 @@ public class FailHandlerTests {
     // Verify that the Sleeper.sleep(1000) call happened on permanent failure branch:
     @Test
     void failHandler_callsSleep_onPermFail() throws InterruptedException {
+        when(props.getFailSleepTime()).thenReturn(1000L);
         t.setAttempts(3);
         when(fixedRandom.nextDouble()).thenReturn(0.9);
         FailHandler failHandler = new FailHandler(queue, mockSleeper, fixedRandom, props);
