@@ -1,5 +1,6 @@
 package com.springqprobackend.springqpro.handlers;
 
+import com.springqprobackend.springqpro.config.TaskHandlerProperties;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
@@ -19,36 +20,39 @@ public class FailHandler implements TaskHandler {
     private final QueueService queue;
     private final Sleeper sleeper;
     private final Random random;
+    private final TaskHandlerProperties props;
 
     @Autowired
-    public FailHandler(@Lazy QueueService queue, Sleeper sleeper) {
+    public FailHandler(@Lazy QueueService queue, Sleeper sleeper, TaskHandlerProperties props) {
         this.queue = queue;
         this.sleeper = sleeper;
         this.random = new Random(); // This is the constructor called by Worker.java, it just uses default Random init.
+        this.props = props;
     }
 
     // This is the for-testing constructor where random is provided by user (to control testing outcomes, see: FailHandlerTests.java):
-    public FailHandler(@Lazy QueueService queue, Sleeper sleeper, Random random) {
+    public FailHandler(@Lazy QueueService queue, Sleeper sleeper, Random random, TaskHandlerProperties props) {
         this.queue = queue;
         this.sleeper = sleeper;
         this.random = random;
+        this.props = props;
     }
 
     @Override
     public void handle(Task task) throws InterruptedException {
         double successChance = 0.25;
         if(random.nextDouble() <= successChance) {
-            sleeper.sleep(2000);
+            sleeper.sleep(props.getFailSuccSleepTime());
             task.setStatus(TaskStatus.COMPLETED);
-            logger.info("[Worker] Task {} (Type: FAIL - 0.25 success rate on retry) completed", task.getId());
+            logger.info("Task {} (Type: FAIL - 0.25 success rate on retry) completed", task.getId());
         } else {
             task.setStatus(TaskStatus.FAILED);
             if (task.getAttempts() < task.getMaxRetries()) {
-                logger.warn("[Worker] Task {} (Type: FAIL - 0.25 success rate on retry) failed! Retrying...", task.getId());
-                queue.retry(task, 1000);
+                logger.warn("Task {} (Type: FAIL - 0.25 success rate on retry) failed! Retrying...", task.getId());
+                queue.retry(task, props.getFailSleepTime());
             } else {
-                sleeper.sleep(1000);
-                logger.error("[Worker] Task {} (Type: FAIL - 0.25 success rate on retry) failed permanently!", task.getId());
+                sleeper.sleep(props.getFailSleepTime());
+                logger.error("Task {} (Type: FAIL - 0.25 success rate on retry) failed permanently!", task.getId());
             }
         }
     }

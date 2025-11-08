@@ -1,5 +1,6 @@
 package com.springqprobackend.springqpro.handlers;
 
+import com.springqprobackend.springqpro.config.TaskHandlerProperties;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
@@ -17,21 +18,23 @@ public class FailAbsHandler implements TaskHandler {
     private static final Logger logger = LoggerFactory.getLogger(FailAbsHandler.class);
     private final QueueService queue;
     private final Sleeper sleeper;
+    private final TaskHandlerProperties props;
 
-    public FailAbsHandler(@Lazy QueueService queue, Sleeper sleeper) {
+    public FailAbsHandler(@Lazy QueueService queue, Sleeper sleeper, TaskHandlerProperties props) {
         this.queue = queue;
         this.sleeper = sleeper;
+        this.props = props;
     }
 
     @Override
     public void handle(Task task) throws InterruptedException {
         task.setStatus(TaskStatus.FAILED);
         if (task.getAttempts() < task.getMaxRetries()) {
-            logger.info("[Worker] Task {} (Type: FAILABS - Fail-Absolute) failed! Retrying...", task.getId());
-            queue.retry(task, 1000);
+            logger.info("Task {} (Type: FAILABS - Fail-Absolute) failed! Retrying...", task.getId());
+            queue.retry(task, props.getFailAbsSleepTime());
         } else {
-            sleeper.sleep(1000);
-            logger.info("[Worker] Task {} (Type: FAILABS - Fail-Absolute) failed permanently!", task.getId());
+            sleeper.sleep(props.getFailAbsSleepTime());
+            logger.info("Task {} (Type: FAILABS - Fail-Absolute) failed permanently!", task.getId());
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.springqprobackend.springqpro.service;
 
+import com.springqprobackend.springqpro.config.QueueProperties;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskType;
@@ -60,6 +61,8 @@ public class QueueServiceTests {
     private TaskHandlerRegistry handlerRegistry;
     @Mock
     private ExecutorService mockExecutor;
+    @Mock
+    private QueueProperties props;
 
     private QueueService queue;
     private Task t;
@@ -77,7 +80,9 @@ public class QueueServiceTests {
     @BeforeEach
     void setUp() {
         ExecutorService immediateExecutor = new DirectExecutorService();
-        queue = new QueueService(immediateExecutor, handlerRegistry);   // Manually constructing the queue (which is why there's no annotation above it earlier).
+        when(props.getMainExecWorkerCount()).thenReturn(5);
+        when(props.getSchedExecWorkerCount()).thenReturn(1);
+        queue = new QueueService(immediateExecutor, handlerRegistry, props);   // Manually constructing the queue (which is why there's no annotation above it earlier).
         // Init Task w/ no-args constructor:
         t = new Task();
         // id and type fields are the ubiquitous fields for testing (e.g., for identification):
@@ -184,7 +189,7 @@ public class QueueServiceTests {
     @Test
     void shutdown_shouldTerminateExecutorService() throws InterruptedException {
         when(mockExecutor.awaitTermination(anyLong(), any())).thenReturn(true);
-        QueueService queueService = new QueueService(mockExecutor, handlerRegistry);
+        QueueService queueService = new QueueService(mockExecutor, handlerRegistry, props);
         queueService.shutdown();    // voila.
 
         verify(mockExecutor).shutdown();
@@ -195,7 +200,7 @@ public class QueueServiceTests {
     @Test
     void shutdown_shouldTerminate_ifTimeoutOccurs() throws InterruptedException {
         when(mockExecutor.awaitTermination(anyLong(), any())).thenReturn(false); // simulate timeout.
-        QueueService service = new QueueService(mockExecutor, handlerRegistry);
+        QueueService service = new QueueService(mockExecutor, handlerRegistry, props);
         service.shutdown();
 
         verify(mockExecutor).shutdown();
@@ -207,7 +212,7 @@ public class QueueServiceTests {
     void shutdown_shouldForceTerminate_ifInterrupted() throws InterruptedException {
         when(mockExecutor.awaitTermination(anyLong(), any())).thenThrow(new InterruptedException("simulated interruption"));
 
-        QueueService service = new QueueService(mockExecutor, handlerRegistry);
+        QueueService service = new QueueService(mockExecutor, handlerRegistry, props);
         service.shutdown();
 
         verify(mockExecutor).shutdown();

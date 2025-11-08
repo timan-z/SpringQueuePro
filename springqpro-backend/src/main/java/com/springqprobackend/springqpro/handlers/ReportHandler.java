@@ -1,5 +1,6 @@
 package com.springqprobackend.springqpro.handlers;
 
+import com.springqprobackend.springqpro.config.TaskHandlerProperties;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
@@ -13,15 +14,17 @@ import org.springframework.stereotype.Component;
 public class ReportHandler implements TaskHandler {
     private static final Logger logger = LoggerFactory.getLogger(ReportHandler.class);
     private final Sleeper sleeper;
+    private final TaskHandlerProperties props;
 
-    public ReportHandler(Sleeper sleeper) {
+    public ReportHandler(Sleeper sleeper, TaskHandlerProperties props) {
         this.sleeper = sleeper;
+        this.props = props;
     }
 
     @Override
     public void handle(Task task) throws InterruptedException {
-        sleeper.sleep(5000);
+        sleeper.sleep(props.getReportSleepTime());
         task.setStatus(TaskStatus.COMPLETED);
-        logger.info("[Worker] Task {} (Type: {}) completed", task.getId(), task.getType());
+        logger.info("Task {} (Type: {}) completed", task.getId(), task.getType());
     }
 }

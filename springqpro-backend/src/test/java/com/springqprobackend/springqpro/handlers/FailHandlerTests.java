@@ -11,6 +11,7 @@ of arguments provided during object initialization. (And this is good too, becau
 logic where I need to adjust how the handler is invoked).
 */
 
+import com.springqprobackend.springqpro.config.TaskHandlerProperties;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.models.Task;
@@ -31,6 +32,8 @@ import static org.mockito.Mockito.*;
 public class FailHandlerTests {
     @Mock
     private QueueService queue;
+    @Mock
+    private TaskHandlerProperties props;
 
     private Sleeper fastSleeper;
     private Sleeper mockSleeper;
@@ -40,6 +43,8 @@ public class FailHandlerTests {
 
     @BeforeEach
     void setUp() {
+        when(props.getFailSleepTime()).thenReturn(1000L);
+        when(props.getFailSuccSleepTime()).thenReturn(2000L);
         fastSleeper = millis -> {}; // Define functional interface implementation w/ Lambda. (Remember this).
         t = new Task();
         t.setId("Task-ArbitraryTastkId");
@@ -54,7 +59,7 @@ public class FailHandlerTests {
         /* In my FailHandler.java class, I define successOdds as 0.25, so if I guarantee fixedRandom.nextDouble returns 0.1
         (which obv <= 0.25, so I'm in the % interval where my random odds succeeded), then I can let failHandler complete this task: */
         when(fixedRandom.nextDouble()).thenReturn(0.1);
-        FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom);
+        FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom, props);
 
         failHandler.handle(t);
         // Assertions:
@@ -67,7 +72,7 @@ public class FailHandlerTests {
     void failHandler_retries_failedTask() throws InterruptedException {
         when(fixedRandom.nextDouble()).thenReturn(0.9);
         // (Dunno if needed)DEBUG: when(queue.retry(any(Task.class),anyLong()).then???
-        FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom);
+        FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom, props);
         // Remember that t.setAttempts() == 0 and t.getMaxRetries() == 3 (there's still room for more attempts, so this case works fine).
 
         failHandler.handle(t);
@@ -80,7 +85,7 @@ public class FailHandlerTests {
     void failHandler_retires_maxFailedTask() throws InterruptedException {
         t.setAttempts(3);   // So, it goes straight to the failed if-condition branch.
         when(fixedRandom.nextDouble()).thenReturn(0.9);
-        FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom);
+        FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom, props);
         failHandler.handle(t);
         assertEquals(TaskStatus.FAILED, t.getStatus());
         verify(queue, never()).retry(eq(t), eq(1000L));
@@ -91,7 +96,7 @@ public class FailHandlerTests {
     @Test
     void failHandler_callsSleep_onSuccess() throws InterruptedException {
         when(fixedRandom.nextDouble()).thenReturn(0.1);
-        FailHandler failHandler = new FailHandler(queue, mockSleeper, fixedRandom);
+        FailHandler failHandler = new FailHandler(queue, mockSleeper, fixedRandom, props);
         failHandler.handle(t);
         verify(mockSleeper, times(1)).sleep(2000L);
     }
@@ -100,7 +105,7 @@ public class FailHandlerTests {
     void failHandler_callsSleep_onPermFail() throws InterruptedException {
         t.setAttempts(3);
         when(fixedRandom.nextDouble()).thenReturn(0.9);
-        FailHandler failHandler = new FailHandler(queue, mockSleeper, fixedRandom);
+        FailHandler failHandler = new FailHandler(queue, mockSleeper, fixedRandom, props);
         failHandler.handle(t);
         verify(mockSleeper, times(1)).sleep(1000L);
     }

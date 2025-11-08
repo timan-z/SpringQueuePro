@@ -22,19 +22,21 @@ public class Worker implements Runnable {
         this.handlerRegistry = handlerRegistry;
     }
 
+
     // "run" will basically be this project's version of GoQueue's StartWorker():
     @Override
     public void run() {
+        String curThreadName = Thread.currentThread().getName();
         try {
             task.setAttempts(task.getAttempts() + 1);
             task.setStatus(TaskStatus.INPROGRESS);
-            logger.info("[Worker] Processing task {} (Attempt {}, Type: {})", task.getId(), task.getAttempts(), task.getType());
+            logger.info("[Worker {}] Processing task {} (Attempt {}, Type: {})", curThreadName, task.getId(), task.getAttempts(), task.getType());
 
             // Replacing the switch-case logic w/ this below:
             TaskHandler handler = handlerRegistry.getHandler(task.getType().name());
             handler.handle(task);
         } catch(Exception e) {
-            logger.error("[Worker] Task {} failed due to error: {}", task.getId(), e.getMessage());
+            logger.error("[Worker {}] Task {} failed due to error: {}", curThreadName, task.getId(), e.getMessage());
             task.setStatus(TaskStatus.FAILED);
         }
     }

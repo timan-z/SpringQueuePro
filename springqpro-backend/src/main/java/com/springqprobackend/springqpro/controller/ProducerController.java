@@ -66,8 +66,10 @@ public class ProducerController {
     // From producer.go: "THIS IS FOR [GET /api/jobs] and [GET /api/jobs?status=queued]" <-- hence why we're using @RequestParam
     @GetMapping("/jobs")
     public ResponseEntity<List<Task>> handleListJobs(@RequestParam(required = false) String status) {
-        Task[] allJobs = queue.getJobs();
-        List<Task> filtered = Arrays.stream(allJobs).filter(t -> t != null && (status == null || t.getStatus().toString().equalsIgnoreCase(status))).collect(Collectors.toList());
+        //Task[] allJobs = queue.getJobs();
+        //List<Task> filtered = Arrays.stream(allJobs).filter(t -> t != null && (status == null || t.getStatus().toString().equalsIgnoreCase(status))).collect(Collectors.toList());
+        List<Task> allJobs = queue.getJobs();
+        List<Task> filtered = allJobs.stream().filter(t -> t != null && (status == null || t.getStatus().toString().equalsIgnoreCase(status))).collect(Collectors.toList());
         return ResponseEntity.ok(filtered);
     }
 
@@ -107,6 +109,12 @@ public class ProducerController {
         if(!deleteRes) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(Map.of("message", String.format("Job %s deleted!", id)));
     }
+    /* DEBUG:+NOTE:+TO-DO: ^ When I get to the stage where I start really expanding on the API endpoints (making this a deployable microservice),
+    I want to change the return value here slightly. In best practice, it's not supposed to be a 200 (OK) response, RESTful API
+    design has it so that what I'd do here is return 204 (No Content) sign, which would imply "the resource was deleted successfully,
+    there is no further content to return."
+    DEBUG:+NOTE:+TO-DO: Re-scan over all the functions, honestly, and evaluate if my return codes are correct later. (Do some more reading into return codes, etc).
+    */
 
     // 6. This is for the [POST /api/clear]
     @PostMapping("/clear")
