@@ -1,15 +1,19 @@
 package com.springqprobackend.springqpro.controller;
 
+import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.service.QueueService;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
+import com.springqprobackend.springqpro.service.TaskService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.List;
@@ -21,12 +25,14 @@ import java.util.stream.Collectors;
 //@CrossOrigin(origins = "${CORS_ALLOWED_ORIGIN}") // for Netlify/Railway CORS (also local dev) <-- this line alone should replace the CORS stuff I had in Producer.go
 public class ProducerController {
     private final QueueService queue;
+    private final TaskService taskService;
 
     /* NOTE: Don't need @Autowired annotation here. Explicit @Autowired is only needed for multiple constructors or setter-based injection.
     -- Spring will automatically inject constructor parameters for single constructors.
     -- Regarding this.queue = queue;, see comment in Worker.java class (Java is pass-by-value for objects, but that value is the reference). */
-    public ProducerController(QueueService queue) {
+    public ProducerController(QueueService queue, TaskService taskService) {
         this.queue = queue;
+        this.taskService = taskService;
     }
 
     // 0. My GoQueue project had a struct "type EnqueueReq struct {...}" in its producer.go file. This would be the equivalent:
@@ -46,7 +52,7 @@ public class ProducerController {
     * */
     @PostMapping("/enqueue")
     public ResponseEntity<Map<String, String>> handleEnqueue(@Valid @RequestBody EnqueueReq req) {
-        if(req.type == null) {
+        /*if(req.type == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Task type is required."));
         }
         Task t = new Task(
@@ -56,10 +62,16 @@ public class ProducerController {
                 TaskStatus.QUEUED,
                 0,
                 3,
-                LocalDateTime.now()
+                Instant.now()
+                //LocalDateTime.now()
         );
         queue.enqueue(t);
-        return ResponseEntity.ok(Map.of("message", String.format("Job %s (Payload: %s, Type: %s) enqueued!", t.getId(), t.getPayload(), t.getType())));
+        return ResponseEntity.ok(Map.of("message", String.format("Job %s (Payload: %s, Type: %s) enqueued!", t.getId(), t.getPayload(), t.getType())));*/
+        if(req.type == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Task type is required."));
+        }
+        TaskEntity entity = taskService.createTask(req.payload, req.type);
+        return ResponseEntity.ok(Map.of("message", String.format("Job %s (Payload: %s, Type: %s) enqueued! Status: %s", entity.getId(), entity.getPayload(), entity.getType().toString(), entity.getStatus().toString())));
     }
 
     // 2. The equivalent of GoQueue's "http.HandleFunc("/api/jobs", func(w http.ResponseWriter, r *http.Request) {...}" function:

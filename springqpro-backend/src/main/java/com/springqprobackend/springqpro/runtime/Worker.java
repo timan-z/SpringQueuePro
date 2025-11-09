@@ -22,7 +22,6 @@ public class Worker implements Runnable {
         this.handlerRegistry = handlerRegistry;
     }
 
-
     // "run" will basically be this project's version of GoQueue's StartWorker():
     @Override
     public void run() {

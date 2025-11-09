@@ -2,6 +2,8 @@ package com.springqprobackend.springqpro.models;
 
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
+
+import java.time.Instant;
 import java.util.Objects;
 import java.time.LocalDateTime;
 
@@ -39,13 +41,13 @@ public class Task {
     private int maxRetries;
 
     @PastOrPresent(message="Creation Time Stamp cannot be in the future.")
-    private LocalDateTime createdAt;   // TO-DO:(?) I format this with LocalDateTime. (I could change this to that type for better filtering and so on).
+    private Instant createdAt;   // TO-DO:(?) I format this with LocalDateTime. (I could change this to that type for better filtering and so on).
 
     // Constructor(s):
     // no-args Constructor - for potential frameworks like Jackson/JPA (that may serialize/deserialize the object):
     public Task() {}
     // Main Constructor:
-    public Task(String id, String payload, TaskType type, TaskStatus status, int attempts, int maxRetries, LocalDateTime createdAt) {
+    public Task(String id, String payload, TaskType type, TaskStatus status, int attempts, int maxRetries, Instant createdAt) {
         this.id = id;
         this.payload = payload;
         this.type = type;
@@ -97,7 +99,7 @@ public class Task {
     public void setMaxRetries(int maxRetries) {
         this.maxRetries = maxRetries;
     }
-    public void setCreatedAt(LocalDateTime createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 

@@ -1,0 +1,18 @@
+type Task {
+    id: ID!
+    payload: String
+    type: String
+    status: String
+    attempts: Int
+    maxRetries: Int
+    createdAt: String
+}
+
+type Query {
+    tasks(status: String): [Task]
+    task(id: ID!): Task
+}
+
+type Mutation {
+    createTask(payload: String!, type: String!): Task
+}
