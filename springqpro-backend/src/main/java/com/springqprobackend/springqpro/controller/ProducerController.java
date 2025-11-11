@@ -108,7 +108,8 @@ public class ProducerController {
                 TaskStatus.QUEUED,
                 0,
                 3,
-                LocalDateTime.now()//.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                Instant.now()
+                //LocalDateTime.now()//.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
         );
         queue.enqueue(tClone);
         return ResponseEntity.ok(tClone);

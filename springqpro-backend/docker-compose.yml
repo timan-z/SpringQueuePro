@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:18
+    container_name: springqpro-db
+    restart: always
+    environment:
+      POSTGRES_USER: springqpro
+      POSTGRES_PASSWORD: springqpro
+      POSTGRES_DB: springqpro
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+
+volumes:
+  pgdata:
