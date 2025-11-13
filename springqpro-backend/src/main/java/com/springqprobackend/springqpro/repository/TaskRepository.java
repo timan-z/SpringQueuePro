@@ -3,7 +3,12 @@ package com.springqprobackend.springqpro.repository;
 import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 /* NOTES-TO-SELF:
@@ -15,6 +20,16 @@ import java.util.List;
 -- deleteById(String id)
 You can also define query methods using naming conventions.
 */
+
+/*
+NOTE(s)-TO-SELF - [PART TWO - 2025-11-13 EDITS]:
+- The @Modifying annotation in Spring Data JPA is for indicating a repository method (annotated with @Query)
+performs a data modification (CRUD) operation.
+- The @Transactional annotation in Spring Boot is used to manage transactions declaratively. I use it
+in service/TaskService.java almost as a sort of "rollback" mechanism, but it also has ACID properties
+(Atomicity, Consistency, Isolation, and Durability) for database operations (which is important here).
+*/
+
 @Repository
 public interface TaskRepository extends JpaRepository<TaskEntity, String> {
     // NOTE: ^ In JpaRepository<TaskEntity, String>, the generic parameters mean entity type and primary key type.
@@ -25,4 +40,16 @@ public interface TaskRepository extends JpaRepository<TaskEntity, String> {
     -- Spring would read the line below as "SLEECT * FROM tasks WHERE status = ?" (REMEMBER THIS!)
     */
     List<TaskEntity> findByStatus(TaskStatus status);
+
+    /*
+    worker tries to claim e.g., via transitionStatus(id, QUEUED, INPROGRESS, currentAttempts+1).
+    If it returns 1, the claim succeeded; otherwise another worker claimed it or the status changed.
+    (This is meant to return the number of rows affected, so !=1 means the update didn't work for xyz reason.
+    Transition status only if the current status matches "from").
+    This is the atomic SQL-style step that prevents two workers from both starting work on the same task.
+    */
+    @Modifying
+    @Transactional
+    @Query("UPDATE TaskEntity t SET t.status = :to, t.attempts = :attempts WHERE t.id = :id AND t.status = :from")
+    int transitionStatus(@Param("id") String id, @Param("from") TaskStatus from, @Param("to") TaskStatus to, @Param("attempts") int attempts);
 }

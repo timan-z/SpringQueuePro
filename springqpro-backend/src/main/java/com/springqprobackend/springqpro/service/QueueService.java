@@ -1,14 +1,12 @@
 package com.springqprobackend.springqpro.service;
 
 import com.springqprobackend.springqpro.config.QueueProperties;
-import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
+import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.runtime.Worker;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,33 +32,21 @@ public class QueueService {
     private final Lock writeLock = rwLock.writeLock();
     private final TaskHandlerRegistry handlerRegistry;
     private final QueueProperties props;
-
-    /* NOTE: In my Worker.java class, for each Job/Task-type handle function, I make the thread sleep for a certain amount of
-    time (ms) e.g., Thread.sleep(2000); primarily to simulate different types of work (mimicking different processing times). But,
-    they served a dual-purpose in preventing race conditions for re-enqueuing failed tasks. (I have both type "fail" and "fail-absolute"
-    sleep for 1 second on known to-fail runs, for fails that do succeed -- I sleep for 2 seconds). But I guess the problem there is that
-    it's only the Worker threads themselves running. So, there's a delay in the retry loop, but it only affects the thread itself instead
-    of the Queue Service that actually does the enqueue functionality.
-    -- This is a Recursive Enqueue Chain (each failed Worker enqueues its successor). For small recursive try counts, it's not a bit deal.
-    But the issue arises in Scheduler Congestion and Tight Retry Loops under edge conditions.
-    -- My Thread.sleep(...) statements rate limit my retries by processing time (making a natural backoff) so there is no immediate
-    risk of runaway recursion. But my retry timing coupling is tied to processing time instead of Queue policy, so it'd be better
-    to offload that retry scheduling into the Queue itself (good practice too because separation of concerns).
-    -- Now, the Worker is only responsible for deciding WHETHER to retry.
-    -- QueueService decides WHEN to retry.
-
-    That's the reason for the field below. Important to get used to decoupled architecture. (Also see new method "public void retry(...){...}").
-    NOTE: Going to keep my Thread.sleep(...); statements in Worker.java for now (also remember they served that first original purpose too).
-    */
     private final ScheduledExecutorService scheduler;
+
+    // DEBUG: 2025-11-13 EDIT: Additions below.
+    private final TaskRepository taskRepository;        // DEBUG: For optional direct DB READS.
+    private final ProcessingService processingService;  // DEBUG: Do processing via transactional service.
 
     // Constructor:
 
     // NOTE: Defining worker.count in the application.properties file (switch to YAML? I have no idea).
     // DEBUG: Temp removing @Lazy from infront of TaskHandlerRegistry handlerRegistry (see if that's okay)
     @Autowired  // DEBUG: See if this fixes the issue!
-    public QueueService(TaskHandlerRegistry handlerRegistry, QueueProperties props) {
+    public QueueService(TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, QueueProperties props) {
         this.jobs = new ConcurrentHashMap<>();
+        this.taskRepository = taskRepository;
+        this.processingService = processingService;
         this.props = props;
         //this.lock = new ReentrantLock();
         this.executor = Executors.newFixedThreadPool(props.getMainExecWorkerCount(), r-> {
@@ -74,12 +60,19 @@ public class QueueService {
 
     // Constructor 2 (specifically for JUnit+Mockito testing purposes, maybe custom setups too I suppose):
     // DEBUG: Temp removing @Lazy from infront of TaskHandlerRegistry handlerRegistry (see if that's okay)
-    public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry, QueueProperties props){
+    public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, QueueProperties props){
         this.jobs = new ConcurrentHashMap<>();
+        this.taskRepository = taskRepository;
+        this.processingService = processingService;
         this.props = props;
         this.executor = executor;
         this.scheduler = Executors.newScheduledThreadPool(props.getSchedExecWorkerCount());
         this.handlerRegistry = handlerRegistry;
+    }
+
+    // DEBUG: 2025-11-13 EDIT: Method additions below. (Kind of replaces some but I'm going to keep my old legacy methods too).
+    public void enqueueById(String id) {
+        executor.submit(() -> processingService.claimAndProcess(id));
     }
 
     // Methods:
@@ -182,6 +175,7 @@ public class QueueService {
     - The ExecutorService needs explicit shutdown (else Spring Boot might hang on exit).
     - This ensures clean terminal (very important when the service is deployed on Railway or whatever).
     */
+    // NOTE: It's just hit me - I don't think I shutdown the scheduled executor????
     @PreDestroy
     public void shutdown() {
         logger.info("[Inside @PreDestroy method] Shutting down QueueService...");
