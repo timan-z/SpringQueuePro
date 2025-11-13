@@ -62,9 +62,10 @@ public class TaskService {
     }
 
     @Transactional
-    public void updateStatus(String id, TaskStatus newStatus) {
+    public void updateStatus(String id, TaskStatus newStatus, int updAttempts) {
         repository.findById(id).ifPresent(task -> {
             task.setStatus(newStatus);
+            task.setAttempts(updAttempts);
             repository.save(task);
         });
     }

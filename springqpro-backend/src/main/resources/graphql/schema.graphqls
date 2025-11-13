@@ -1,18 +1,78 @@
+# NOTE-TO-SELF: The GraphQL endpoint and controller I have is to query DataBase-persisted Tasks (not in-memory).
+# NOTE-TO-SELF: This is basically just replicating the structure of TaskService.java (also partly for interacting with the DB).
 type Task {
     id: ID!
-    payload: String
-    type: String
-    status: String
-    attempts: Int
-    maxRetries: Int
-    createdAt: String
+    payload: String!
+    type: TaskType!
+    status: TaskStatus!
+    attempts: Int!
+    maxRetries: Int!
+    createdAt: String!
 }
-
+"""
+Enumeration for Task Status:
+"""
+# Pasting what's in /enums/TaskStatus.java:
+enum TaskStatus {
+    QUEUED,
+    INPROGRESS,
+    COMPLETED,
+    FAILED
+}
+"""
+Enumeration for Task Type:
+"""
+# Pasting what's in /enums/TaskType.java:
+enum TaskType {
+    EMAIL,
+    REPORT,
+    DATACLEANUP,
+    SMS,
+    NEWSLETTER,
+    TAKESLONG,
+    FAIL,
+    FAILABS,
+    TEST
+}
+"""
+Input type for creating a new task.
+"""
+input CreateTaskInput {
+    payload: String!
+    type: TaskType!
+}
+"""
+Input type for updating an existing task (partial / standard routine update as part of the system flow).
+"""
+input StdUpdateTaskInput {
+    id: ID!,
+    status: TaskStatus,
+    attempts: Int
+}
+# Query = to retrieve/read data.
 type Query {
-    tasks(status: String): [Task]
+    """
+    For retrieving tasks w/ option to pass TaskStatus to filter. Returned value must bare-minimum be an empty list (of non-NULL Tasks).
+    """
+    tasks(status:TaskStatus): [Task!]!
+    """
+    Retrieving a single task given ID:
+    """
     task(id: ID!): Task
 }
-
+# Mutation = to update/write data.
 type Mutation {
-    createTask(payload: String!, type: String!): Task
+    """
+    Create and enqueue a new task:
+    """
+    createTask(input: CreateTaskInput!): Task!
+    """
+    Update Task attributes (namely, status and attempts #):
+    """
+    # NOTE: In my in-memory QueueService, these updates occur programmatically, but this function will serve to translate changes to DB.
+    updateTask(input: StdUpdateTaskInput!): Task
+    """
+    Deleting a Task by ID:
+    """
+    deleteTask(id: ID!): Boolean!
 }
