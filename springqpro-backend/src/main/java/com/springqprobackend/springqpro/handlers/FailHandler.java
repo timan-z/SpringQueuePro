@@ -1,6 +1,7 @@
 package com.springqprobackend.springqpro.handlers;
 
 import com.springqprobackend.springqpro.config.TaskHandlerProperties;
+import com.springqprobackend.springqpro.config.TaskProcessingException;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
@@ -39,21 +40,17 @@ public class FailHandler implements TaskHandler {
     }
 
     @Override
-    public void handle(Task task) throws InterruptedException {
+    public void handle(Task task) throws InterruptedException, TaskProcessingException {
         double successChance = 0.25;
         if(random.nextDouble() <= successChance) {
             sleeper.sleep(props.getFailSuccSleepTime());
             task.setStatus(TaskStatus.COMPLETED);
             logger.info("Task {} (Type: FAIL - 0.25 success rate on retry) completed", task.getId());
         } else {
-            task.setStatus(TaskStatus.FAILED);
-            if (task.getAttempts() < task.getMaxRetries()) {
-                logger.warn("Task {} (Type: FAIL - 0.25 success rate on retry) failed! Retrying...", task.getId());
-                queue.retry(task, props.getFailSleepTime());
-            } else {
-                sleeper.sleep(props.getFailSleepTime());
-                logger.error("Task {} (Type: FAIL - 0.25 success rate on retry) failed permanently!", task.getId());
-            }
+            // 2025-11-15-DEBUG: As of the ProcessingService.java-related architectural overhaul, Handlers no longer manually change state.
+            sleeper.sleep(props.getFailSleepTime());
+            logger.warn("Task {} (Type: FAIL - 0.25 success rate on retry) failed! Retrying...", task.getId());
+            throw new TaskProcessingException("Intentional fail for retry simulation");
         }
     }
 }

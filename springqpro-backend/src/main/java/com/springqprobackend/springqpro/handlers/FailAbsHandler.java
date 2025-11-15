@@ -1,6 +1,7 @@
 package com.springqprobackend.springqpro.handlers;
 
 import com.springqprobackend.springqpro.config.TaskHandlerProperties;
+import com.springqprobackend.springqpro.config.TaskProcessingException;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
@@ -27,14 +28,10 @@ public class FailAbsHandler implements TaskHandler {
     }
 
     @Override
-    public void handle(Task task) throws InterruptedException {
-        task.setStatus(TaskStatus.FAILED);
-        if (task.getAttempts() < task.getMaxRetries()) {
-            logger.info("Task {} (Type: FAILABS - Fail-Absolute) failed! Retrying...", task.getId());
-            queue.retry(task, props.getFailAbsSleepTime());
-        } else {
-            sleeper.sleep(props.getFailAbsSleepTime());
-            logger.info("Task {} (Type: FAILABS - Fail-Absolute) failed permanently!", task.getId());
-        }
+    public void handle(Task task) throws InterruptedException, TaskProcessingException {
+        // 2025-11-15-DEBUG: As of the ProcessingService.java-related architectural overhaul, Handlers no longer manually change state.
+        sleeper.sleep(props.getFailAbsSleepTime());
+        logger.warn("Task {} (Type: FAILABS - Fail-Absolute) failed! Retrying...", task.getId());
+        throw new TaskProcessingException("Intentional fail for retry simulation");
     }
 }

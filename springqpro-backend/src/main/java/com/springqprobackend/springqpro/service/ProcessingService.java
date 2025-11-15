@@ -146,7 +146,7 @@ public class ProcessingService {
 
     EDIT: It's only for retries that the exponential stuff is applied, and makes sense.
     TO-DO: Edit the method below so that computeBackOffMs() uses values from TaskHandlerProperties as a "base delay" to be used as a multiplier.
-    (Best of both worlds and its' a nice thing to carry over from my prototype phase).
+    (Best of both worlds and it's a nice thing to carry over from my prototype phase).
     */
     private long computeBackoffMs(int attempts) {
         // exponential backoff base 1000ms. apparently this is common practice in cloud stuff so might as well start it now.
