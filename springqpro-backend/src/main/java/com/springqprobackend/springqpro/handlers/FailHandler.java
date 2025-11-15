@@ -44,7 +44,6 @@ public class FailHandler implements TaskHandler {
         double successChance = 0.25;
         if(random.nextDouble() <= successChance) {
             sleeper.sleep(props.getFailSuccSleepTime());
-            task.setStatus(TaskStatus.COMPLETED);
             logger.info("Task {} (Type: FAIL - 0.25 success rate on retry) completed", task.getId());
         } else {
             // 2025-11-15-DEBUG: As of the ProcessingService.java-related architectural overhaul, Handlers no longer manually change state.

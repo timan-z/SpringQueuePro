@@ -24,7 +24,6 @@ public class SmsHandler implements TaskHandler {
     @Override
     public void handle(Task task) throws InterruptedException {
         sleeper.sleep(props.getSmsSleepTime());
-        task.setStatus(TaskStatus.COMPLETED);
         logger.info("Task {} (Type: {}) completed", task.getId(), task.getType());
     }
 }

@@ -23,9 +23,7 @@ public class DefaultHandler implements TaskHandler {
     @Override
     public void handle(Task task) throws InterruptedException {
         logger.info("[Worker] No specific handler found for type '{}'. Executing default behavior.", task.getType());
-        //Thread.sleep(2000);
         sleeper.sleep(props.getDefaultSleepTime());
-        task.setStatus(TaskStatus.COMPLETED);
         logger.info("Task {} (Type: {}) completed", task.getId(), task.getType());
     }
 }

@@ -25,7 +25,6 @@ public class DataCleanUpHandler implements TaskHandler {
     @Override
     public void handle(Task task) throws InterruptedException {
         sleeper.sleep(props.getDataCleanUpSleepTime());
-        task.setStatus(TaskStatus.COMPLETED);
         logger.info("Task {} (Type: {}) completed", task.getId(), task.getType());
     }
 }

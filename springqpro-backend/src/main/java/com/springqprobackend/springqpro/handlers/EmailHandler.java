@@ -24,7 +24,6 @@ public class EmailHandler implements TaskHandler {
     @Override
     public void handle(Task task) throws InterruptedException {
         sleeper.sleep(props.getEmailSleepTime());
-        task.setStatus(TaskStatus.COMPLETED);
         logger.info("Task {} (Type: {}) completed", task.getId(), task.getType());
     }
 }
