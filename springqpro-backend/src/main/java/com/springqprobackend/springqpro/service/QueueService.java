@@ -7,6 +7,7 @@ import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.runtime.Worker;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,7 +81,7 @@ public class QueueService {
 
     // Constructor:
     @Autowired  // DEBUG: See if this fixes the issue!
-    public QueueService(TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, ExecutorService executor, ScheduledExecutorService scheduler, QueueProperties props) {
+    public QueueService(TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, @Qualifier("execService") ExecutorService executor, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueProperties props) {
         this.jobs = new ConcurrentHashMap<>();
         this.taskRepository = taskRepository;
         this.processingService = processingService;

@@ -23,7 +23,9 @@ public class ExecutorConfig {
     // Field(s):
     private QueueProperties props;  // NOTE: QueueProperties is in the same package so no import needed (DEBUG: May change down the line?).
 
-    @Bean
+    public ExecutorConfig(QueueProperties props) { this.props = props; }
+
+    @Bean("execService")
     public ExecutorService taskExecutor() {
        return Executors.newFixedThreadPool(props.getMainExecWorkerCount(), r -> {
            Thread t = new Thread(r);
@@ -32,7 +34,7 @@ public class ExecutorConfig {
        });
     }
 
-    @Bean
+    @Bean("schedExec")
     public ScheduledExecutorService taskScheduler() {
         return Executors.newScheduledThreadPool(props.getSchedExecWorkerCount());
     }

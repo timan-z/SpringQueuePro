@@ -9,6 +9,7 @@ import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -80,6 +81,7 @@ public class ProcessingService {
     private final ScheduledExecutorService scheduler;   // Handles micro-level retry scheduling — backoff logic for failed tasks only.
     private final QueueService queueService; // to re-enqueue by id when scheduling retries
     // Constructor(s):
+    @Lazy
     public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, TaskMapper taskMapper, ScheduledExecutorService scheduler, QueueService queueService) {
         this.taskRepository = taskRepository;
         this.handlerRegistry = handlerRegistry;
