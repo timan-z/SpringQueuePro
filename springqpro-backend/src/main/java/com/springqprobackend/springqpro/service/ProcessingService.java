@@ -3,6 +3,7 @@ package com.springqprobackend.springqpro.service;
 import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
+import com.springqprobackend.springqpro.mapper.TaskMapper;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.repository.TaskRepository;
@@ -75,16 +76,17 @@ public class ProcessingService {
     private static final Logger logger = LoggerFactory.getLogger(ProcessingService.class);
     private final TaskRepository taskRepository;
     private final TaskHandlerRegistry handlerRegistry;
+    private final TaskMapper taskMapper;
     private final ScheduledExecutorService scheduler;   // Handles micro-level retry scheduling — backoff logic for failed tasks only.
     private final QueueService queueService; // to re-enqueue by id when scheduling retries
     // Constructor(s):
-    public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, ScheduledExecutorService scheduler, QueueService queueService) {
+    public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, TaskMapper taskMapper, ScheduledExecutorService scheduler, QueueService queueService) {
         this.taskRepository = taskRepository;
         this.handlerRegistry = handlerRegistry;
+        this.taskMapper = taskMapper;
         this.scheduler = scheduler;
         this.queueService = queueService;
     }
-
     // Method for attempting to claim a Task and process it. This method coordinates DB-level claim and handler execution.
     // The retry doesn’t live inside the handler anymore — it’s a post-processing policy in ProcessingService. If it throws, the failure is caught in the ProcessingService try/catch block.
     public void claimAndProcess(String taskId) {
@@ -103,17 +105,9 @@ public class ProcessingService {
         if (claimed == null) return;
 
         // Convert to in-memory Task model for existing handlers (you can also change handlers to accept TaskEntity)
-        /* DEBUG:+NOTE:+TO-DO: ^ This is not the best (?) Think I should adjust my TaskHandlers to accept TaskEntity too
-        or maybe just have a helper method that does the conversion externally. (Maybe both). Not high priority though, get main stuff working first. */
-        Task model = new Task(
-                claimed.getId(),
-                claimed.getPayload(),
-                claimed.getType(),
-                claimed.getStatus(),
-                claimed.getAttempts(),
-                claimed.getMaxRetries(),
-                claimed.getCreatedAt() != null ? claimed.getCreatedAt() : null
-        );
+        // NOTE: Considered proper DDD Principle to NOT have Persistence Objects mix with my Handlers!
+        Task model = taskMapper.toDomain(claimed);
+
         // try-catch-block to do the processing:
         try {
             TaskHandler handler = handlerRegistry.getHandler(model.getType().name());
@@ -122,6 +116,7 @@ public class ProcessingService {
             }
             handler.handle(model);
             claimed.setStatus(TaskStatus.COMPLETED);
+            taskMapper.updateEntity(model, claimed);    // 2025-11-15-EDIT: ADDED THIS!
             taskRepository.save(claimed);
         } catch(Exception ex) {
             // ProcessingService catches Task FAILs gracefully - marking it as FAILED, persisting it, and re-enqueuing it with backoff.
