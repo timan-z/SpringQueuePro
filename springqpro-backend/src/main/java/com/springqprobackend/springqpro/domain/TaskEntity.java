@@ -96,6 +96,7 @@ public class TaskEntity {
     public int getAttempts() { return attempts; }
     public int getMaxRetries() { return maxRetries; }
     public Instant getCreatedAt() { return createdAt; }
+    public Long getVersion() { return version; }
     // setters:
     public void setId(String id) { this.id = id; }
     public void setPayload(String payload) { this.payload = payload; }

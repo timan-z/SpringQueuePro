@@ -9,8 +9,10 @@ import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
@@ -82,7 +84,7 @@ public class ProcessingService {
     private final QueueService queueService; // to re-enqueue by id when scheduling retries
     // Constructor(s):
     @Lazy
-    public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, TaskMapper taskMapper, ScheduledExecutorService scheduler, QueueService queueService) {
+    public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, TaskMapper taskMapper, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueService queueService) {
         this.taskRepository = taskRepository;
         this.handlerRegistry = handlerRegistry;
         this.taskMapper = taskMapper;
@@ -91,14 +93,18 @@ public class ProcessingService {
     }
     // Method for attempting to claim a Task and process it. This method coordinates DB-level claim and handler execution.
     // The retry doesn’t live inside the handler anymore — it’s a post-processing policy in ProcessingService. If it throws, the failure is caught in the ProcessingService try/catch block.
+    @Transactional  // <-- forgot this, it should 100% be here.
     public void claimAndProcess(String taskId) {
+        logger.info("[ProcessingService] starting claimAndProcess for {}", taskId);
         // Load current in-DB Task snapshot (it'll be "frozen" as QUEUED until this method "claims" it):
         // NOTE: As alluded to, this is basically replacing the "Thread dequeues as processes a Task" functionality of QueueService.
         Optional<TaskEntity> snapshot = taskRepository.findById(taskId);    // NOTE: Remember this is a built-in function when you extend JPA.
         if(snapshot.isEmpty()) return;
         TaskEntity current = snapshot.get();
         // Attempt to claim: change QUEUED -> INPROGRESS (atomically w/ TaskRepository), increment attempts:
+        logger.info("[ProcessingService] attempting transition for {} attempts {}", taskId, current.getAttempts() + 1);
         int updated = taskRepository.transitionStatus(taskId, TaskStatus.QUEUED, TaskStatus.INPROGRESS, current.getAttempts() + 1);
+        logger.info("[ProcessingService] transition returned count={}", updated);
         if (updated == 0) {
             return; // Claim failed: already claimed or status has been changed.
         }
@@ -117,9 +123,12 @@ public class ProcessingService {
                 handler = handlerRegistry.getHandler("DEFAULT");
             }
             handler.handle(model);
-            claimed.setStatus(TaskStatus.COMPLETED);
+            model.setStatus(TaskStatus.COMPLETED);
+            model.setAttempts(model.getAttempts() + 1);
+            //claimed.setStatus(TaskStatus.COMPLETED); <-- I'm an idiot on autopilot what was I doing here.
             taskMapper.updateEntity(model, claimed);    // 2025-11-15-EDIT: ADDED THIS!
-            taskRepository.save(claimed);
+            TaskEntity persisted = taskRepository.save(claimed);
+            logger.info("[ProcessingService] after save - id: {}, status: {}, attempts: {}, version: {}", persisted.getId(), persisted.getStatus(), persisted.getAttempts(), persisted.getVersion());
         } catch(Exception ex) {
             // ProcessingService catches Task FAILs gracefully - marking it as FAILED, persisting it, and re-enqueuing it with backoff.
             claimed.setStatus(TaskStatus.FAILED);
@@ -132,6 +141,7 @@ public class ProcessingService {
                 logger.error("Task failed permanently. DEBUG: Come and write a more detailed case here later I barely slept.");
             }
         }
+        logger.info("[ProcessingService] finishing claimAndProcess for {} -> status now {}", taskId, claimed.getStatus());
     }
 
     /* NOTE: In my original setup from the ProtoType phase (SpringQueue), I had fixed times set for the Task processing

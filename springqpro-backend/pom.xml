@@ -65,13 +65,38 @@
             <version>42.7.8</version>
         </dependency>
 
-        <!-- Testcontainers for running PostgreSQL locally with Docker.  -->
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <version>3.5.7</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <version>2.0.1</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Testcontainers for running Postgres locally with Docker.  -->
+        <!--<dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
             <version>1.21.3</version>
             <scope>test</scope>
+        </dependency>-->
+        <!-- Just adding this to suppress a mostly benign warning I get from the testcontainers dependency above. (EDIT: the one above the commented out one now too). -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.28.0</version>
         </dependency>
+        <!-- NOTE: Apparently, Apache Commons libraries almost always have CVEs reported. You'll find yourself in an infinite loop chasing them forever. -->
 
         <!-- For waiting on async conditions during testing. -->
         <dependency>

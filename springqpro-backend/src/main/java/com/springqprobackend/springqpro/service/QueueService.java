@@ -104,7 +104,11 @@ public class QueueService {
 
     // DEBUG: 2025-11-13 EDIT: Method additions below. (Kind of replaces some but I'm going to keep my old legacy methods too).
     public void enqueueById(String id) {
-        executor.submit(() -> processingService.claimAndProcess(id));
+        logger.info("[QueueService] enqueueById called for {}", id);
+        executor.submit(() -> {
+                logger.info("[QueueService] submitting runnable for {}", id);
+                processingService.claimAndProcess(id);
+        });
     }
 
     // Methods:

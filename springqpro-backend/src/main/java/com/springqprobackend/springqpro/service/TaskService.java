@@ -3,8 +3,13 @@ package com.springqprobackend.springqpro.service;
 import com.springqprobackend.springqpro.domain.*;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
+import com.springqprobackend.springqpro.events.TaskCreatedEvent;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.repository.TaskRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
@@ -17,12 +22,20 @@ import java.util.Optional;
 - This file combines persistence (DataBase) and in-memory processing (QueueService).
 ^ In other words: This Service orchestrates persistence and queue interaction.
 -- @Transactional is an annotation for if anything fails inside the method, then DataBase changes will roll back.
+EDIT: Forgot to wire this whole part in my bad.
+- ApplicationEventPublisher is an interface in the Spring Framework that encapsulates event publication functionality,
+allowing for decoupling of application components through event-driven architecture. [Google AI Description].
 */
 
 @Service
 public class TaskService {
+    private static final Logger logger = LoggerFactory.getLogger(TaskService.class);
     private final TaskRepository repository;
     private final QueueService queueService;
+
+    @Autowired
+    private ApplicationEventPublisher publisher;
+
     public TaskService(TaskRepository repository, QueueService queueService) {
         this.repository = repository;
         this.queueService = queueService;
@@ -40,7 +53,10 @@ public class TaskService {
                 Instant.now()
         );
         repository.save(entity);
-        Task task = new Task(
+        logger.info("[TaskService] saved task {}, publishing event", entity.getId());
+        publisher.publishEvent(new TaskCreatedEvent(this, entity.getId()));
+        logger.info("[TaskService] published TaskCreatedEvent for {}", entity.getId());
+        /*Task task = new Task(
                 entity.getId(),
                 entity.getPayload(),
                 entity.getType(),
@@ -48,15 +64,18 @@ public class TaskService {
                 entity.getAttempts(),
                 entity.getMaxRetries(),
                 entity.getCreatedAt()
-        );
-        queueService.enqueue(task);
+        );*/
+        //queueService.enqueue(task); <-- OUTDATED LEGACY METHOD. Supposed to call enqueueById now!
+        //queueService.enqueueById(entity.getId()); // <-- wait no this is not what I'm supposed to be doing either dummy.
+        // ^ I didn't guarantee that the entity was in the database before enqueueing. My bad.
         return entity;
     }
 
     public List<TaskEntity> getAllTasks(TaskStatus status) {
-        if(status == null) return repository.findAll();
+        if (status == null) return repository.findAll();
         return repository.findByStatus(status);
     }
+
     public Optional<TaskEntity> getTask(String id) {
         return repository.findById(id); // Optional basically means this value may or may not exist.
     }
@@ -69,9 +88,10 @@ public class TaskService {
             repository.save(task);
         });
     }
+
     @Transactional
     public boolean deleteTask(String id) {
-        if(repository.existsById(id)) {
+        if (repository.existsById(id)) {
             repository.deleteById(id);
             return true;
         }
