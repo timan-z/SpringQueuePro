@@ -106,6 +106,7 @@ public class ProcessingService {
         int updated = taskRepository.transitionStatus(taskId, TaskStatus.QUEUED, TaskStatus.INPROGRESS, current.getAttempts() + 1);
         logger.info("[ProcessingService] transition returned count={}", updated);
         if (updated == 0) {
+            logger.warn("[ProcessingService] claim for {} failed (transition returned 0) — likely status mismatch", taskId);
             return; // Claim failed: already claimed or status has been changed.
         }
         // Re-fetch the fresh TaskEntity now that we claimed it
@@ -124,17 +125,25 @@ public class ProcessingService {
             }
             handler.handle(model);
             model.setStatus(TaskStatus.COMPLETED);
-            model.setAttempts(model.getAttempts() + 1);
+            //model.setAttempts(model.getAttempts() + 1); <-- Also pretty sure I'm not supposed to have this. No idea why I added this.
             //claimed.setStatus(TaskStatus.COMPLETED); <-- I'm an idiot on autopilot what was I doing here.
             taskMapper.updateEntity(model, claimed);    // 2025-11-15-EDIT: ADDED THIS!
             TaskEntity persisted = taskRepository.save(claimed);
             logger.info("[ProcessingService] after save - id: {}, status: {}, attempts: {}, version: {}", persisted.getId(), persisted.getStatus(), persisted.getAttempts(), persisted.getVersion());
         } catch(Exception ex) {
             // ProcessingService catches Task FAILs gracefully - marking it as FAILED, persisting it, and re-enqueuing it with backoff.
-            claimed.setStatus(TaskStatus.FAILED);
+            // 2025-11-17-DEBUG: Actually have no idea what I was doing here.
+            model.setStatus(TaskStatus.FAILED);
+            taskMapper.updateEntity(model, claimed);
             taskRepository.save(claimed);
             if (claimed.getAttempts() < claimed.getMaxRetries()) {
                 long delayMs = computeBackoffMs(claimed.getAttempts());
+                /* 2025-11-17-DEBUG: OKAY, it looks like I spotted a massive architectural flaw inside my processAndClaim() logic.
+                When a Thread tries to claim a Task, it does this: int updated = taskRepository.transitionStatus(taskId, TaskStatus.QUEUED, TaskStatus.INPROGRESS, current.getAttempts() + 1);,
+                but that's the thing -- it expects the persisted Task to be of type QUEUED, but the problem, when I re-enqueue a Task, I never
+                set the Status back to QUEUED; it remains FAILED so this method simply cannot run properly. That's why my Integration Test re-enqueing keeps messing up. */
+                int requeued = taskRepository.transitionStatusSimple(taskId, TaskStatus.FAILED, TaskStatus.QUEUED);
+                logger.info("[ProcessingService] requeue DB update for {} returned {}", taskId, requeued);
                 scheduler.schedule(() -> queueService.enqueueById(taskId), delayMs, TimeUnit.MILLISECONDS);
             } else {
                 // permanent failure:

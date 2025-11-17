@@ -52,21 +52,6 @@ public class ProducerController {
     * */
     @PostMapping("/enqueue")
     public ResponseEntity<Map<String, String>> handleEnqueue(@Valid @RequestBody EnqueueReq req) {
-        /*if(req.type == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Task type is required."));
-        }
-        Task t = new Task(
-                "Task-" + System.nanoTime(),
-                req.payload,
-                req.type,
-                TaskStatus.QUEUED,
-                0,
-                3,
-                Instant.now()
-                //LocalDateTime.now()
-        );
-        queue.enqueue(t);
-        return ResponseEntity.ok(Map.of("message", String.format("Job %s (Payload: %s, Type: %s) enqueued!", t.getId(), t.getPayload(), t.getType())));*/
         if(req.type == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Task type is required."));
         }

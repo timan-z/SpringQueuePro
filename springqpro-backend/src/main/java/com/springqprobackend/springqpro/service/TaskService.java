@@ -56,18 +56,6 @@ public class TaskService {
         logger.info("[TaskService] saved task {}, publishing event", entity.getId());
         publisher.publishEvent(new TaskCreatedEvent(this, entity.getId()));
         logger.info("[TaskService] published TaskCreatedEvent for {}", entity.getId());
-        /*Task task = new Task(
-                entity.getId(),
-                entity.getPayload(),
-                entity.getType(),
-                entity.getStatus(),
-                entity.getAttempts(),
-                entity.getMaxRetries(),
-                entity.getCreatedAt()
-        );*/
-        //queueService.enqueue(task); <-- OUTDATED LEGACY METHOD. Supposed to call enqueueById now!
-        //queueService.enqueueById(entity.getId()); // <-- wait no this is not what I'm supposed to be doing either dummy.
-        // ^ I didn't guarantee that the entity was in the database before enqueueing. My bad.
         return entity;
     }
 

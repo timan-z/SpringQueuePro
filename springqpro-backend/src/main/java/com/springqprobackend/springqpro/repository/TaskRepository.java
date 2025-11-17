@@ -52,4 +52,10 @@ public interface TaskRepository extends JpaRepository<TaskEntity, String> {
     @Transactional
     @Query("UPDATE TaskEntity t SET t.status = :to, t.attempts = :attempts WHERE t.id = :id AND t.status = :from")
     int transitionStatus(@Param("id") String id, @Param("from") TaskStatus from, @Param("to") TaskStatus to, @Param("attempts") int attempts);
+
+    // 2025-11-17-DEBUG: ADDING ANOTHER ONE TO SET A RE-ENQUEUED TASK'S STATUS BACK TO QUEUED!!!
+    @Modifying
+    @Transactional
+    @Query("UPDATE TaskEntity t SET t.status = :to WHERE t.id = :id AND t.status = :from")
+    int transitionStatusSimple(@Param("id") String id, @Param("from") TaskStatus from, @Param("to") TaskStatus to);
 }
