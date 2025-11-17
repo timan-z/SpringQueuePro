@@ -46,6 +46,12 @@ public void sweepQueuedTasks() {
 }" <-- That is what Kafka consumers, SQS workers, and Airflow do. (So this is a more cloud-native solution, but figure things out deeper later).
 */
 
+/* This method here basically:
+1. Boots up the Spring context with a PostgreSQL Testcontainer.
+2. Calls the REST endpoint w/ TestRestTemplate to create a Task (this will persist the TaskEntity and enqueue w/ TaskService).
+3. Waits (w/ Awaitility) for the DB row to become COMPLETED verifying that the ProcessingService ran and handler executed, status persisted.
+- Uses Awaitility to wait for ProcessingService's asynchronous processing.
+*/
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class CreateAndProcessTaskIntegrationTest {
