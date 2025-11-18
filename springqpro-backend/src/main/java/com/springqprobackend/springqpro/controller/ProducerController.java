@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,9 +26,10 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 //@CrossOrigin(origins = "${CORS_ALLOWED_ORIGIN}") // for Netlify/Railway CORS (also local dev) <-- this line alone should replace the CORS stuff I had in Producer.go
 public class ProducerController {
+    // Field(s):
+    private static final Logger logger = LoggerFactory.getLogger(ProducerController.class);
     private final QueueService queue;
     private final TaskService taskService;
-
     /* NOTE: Don't need @Autowired annotation here. Explicit @Autowired is only needed for multiple constructors or setter-based injection.
     -- Spring will automatically inject constructor parameters for single constructors.
     -- Regarding this.queue = queue;, see comment in Worker.java class (Java is pass-by-value for objects, but that value is the reference). */
@@ -59,6 +62,11 @@ public class ProducerController {
         return ResponseEntity.ok(Map.of("message", String.format("Job %s (Payload: %s, Type: %s) enqueued! Status: %s", entity.getId(), entity.getPayload(), entity.getType().toString(), entity.getStatus().toString())));
     }
 
+    /* 2025-11-17-DEBUG: JUST SOMETHING TO UNDERSTAND -- EFFECTIVELY EVERYTHING BENEATH HERE IS LEGACY CODE.
+    FOR ALL OF THIS RETRIEVAL DATA, WE'RE GOING TO BE WORKING WITH GRAPHQL OR EVEN THE MIRROR REST CONTROLLER
+    THAT I HAVE WRITTEN AND DEFINED INSIDE THE SAME DIRECTORY. */
+    // EDIT: LIKE I MIGHT AS WELL SWAP IN ALL THE CODE FOR WHAT I HAVE IN TaskRestController's COUNTERPART METHODS.
+
     // 2. The equivalent of GoQueue's "http.HandleFunc("/api/jobs", func(w http.ResponseWriter, r *http.Request) {...}" function:
     // From producer.go: "THIS IS FOR [GET /api/jobs] and [GET /api/jobs?status=queued]" <-- hence why we're using @RequestParam
     @GetMapping("/jobs")
@@ -66,6 +74,7 @@ public class ProducerController {
         //Task[] allJobs = queue.getJobs();
         //List<Task> filtered = Arrays.stream(allJobs).filter(t -> t != null && (status == null || t.getStatus().toString().equalsIgnoreCase(status))).collect(Collectors.toList());
         List<Task> allJobs = queue.getJobs();
+        logger.info("The value of allJobs is {} and the value of queue.getJobs() is {}", allJobs, queue.getJobs());
         List<Task> filtered = allJobs.stream().filter(t -> t != null && (status == null || t.getStatus().toString().equalsIgnoreCase(status))).collect(Collectors.toList());
         return ResponseEntity.ok(filtered);
     }
