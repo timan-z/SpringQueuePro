@@ -1,13 +1,9 @@
 package com.springqprobackend.springqpro.integration;
 
-import com.springqprobackend.springqpro.config.TaskHandlerProperties;
 import com.springqprobackend.springqpro.config.TaskProcessingException;
 import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
-import com.springqprobackend.springqpro.handlers.FailHandler;
-import com.springqprobackend.springqpro.handlers.FailHandlerTests;
-import com.springqprobackend.springqpro.interfaces.Sleeper;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.repository.TaskRepository;
@@ -15,8 +11,6 @@ import com.springqprobackend.springqpro.service.QueueService;
 import com.springqprobackend.springqpro.service.TaskService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,17 +85,17 @@ public class RetryBehaviorIntegrationTest {
             };
         }
     }
-
+    // 2025-11-17-DEBUG: Renaming the Test name. (Checking that it's QUEUED is more accurate than checking if it's FAILED).
     @Test
-    void failingTask_markedFailed_andRetryScheduled() {
+    void failingTask_isRequeued_andRetryScheduled() {
         // 1. MAKE TASK:
         TaskEntity entity = taskService.createTask("RETRY TEST", TaskType.FAIL);
         String id = entity.getId();
 
         // WAIT FOR FIRST FAILURE:
-        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
             TaskEntity e = taskRepository.findById(id).orElseThrow();
-            assertThat(e.getStatus()).isEqualTo(TaskStatus.QUEUED); // <-- Pretty sure this should actually check to see if it was QUEUED (to imply that requeue is coming).
+            assertThat(e.getStatus()).isEqualTo(TaskStatus.QUEUED); // <-- EDIT: Pretty sure this should actually check to see if it was QUEUED and not FAILED (to imply that requeue is coming).
             assertThat(e.getAttempts()).isGreaterThanOrEqualTo(1);
         });
         // WAIT FOR REQUEUE + SECOND ATTEMPT -> ATTEMPTS INCREASED:
@@ -109,45 +103,5 @@ public class RetryBehaviorIntegrationTest {
             TaskEntity e = taskRepository.findById(id).orElseThrow();
             assertThat(e.getAttempts()).isGreaterThanOrEqualTo(2);
         });
-
-        // 2. WAIT FOR TASK TO BE PROCESSED AND MARKED "FAILED":
-        /*Awaitility.await()
-                .atMost(Duration.ofSeconds(10))
-                .pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> {
-                    TaskEntity e = taskRepository.findById(id).orElseThrow();
-                    assertThat(e.getStatus()).isEqualTo(TaskStatus.FAILED);
-                    assertThat(e.getAttempts()).isGreaterThanOrEqualTo(1);
-                });
-
-        // 3. VERIFY THAT RETRY SCHEDULING HAPPENED (DETECT VIA enqueueById() BEING INVOKED -- MUCH SAFER TEST):
-        Awaitility.await()
-                .atMost(Duration.ofSeconds(5))
-                .untilAsserted(() -> {
-                    verify(queueService, atLeastOnce()).enqueueById(id);
-                });*/
-
-        // wait for the attempt to be recorded (ProcessingService should claim and set attempts >=1)
-        // Wait for the Task to be persisted and claimed by ProcessingService.
-        /*Awaitility.await()
-                .atMost(Duration.ofSeconds(8))
-                .pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> {
-                    Optional<TaskEntity> maybe = taskRepository.findById(id);
-                    assertThat(maybe).isPresent();
-                    TaskEntity e = maybe.get();
-                    // Make sure the processing attempt failed and attempts incremented.
-                    assertThat(e.getAttempts()).isGreaterThanOrEqualTo(1);
-                    assertThat(e.getStatus()).isEqualTo(TaskStatus.FAILED);
-                });
-        // Now ensure retry scheduling re-enqueued the task (attempts will increase after the scheduled retry occurs)
-        Awaitility.await()
-                .atMost(Duration.ofSeconds(12))
-                .pollInterval(Duration.ofMillis(300))
-                .untilAsserted(() -> {
-                    Optional<TaskEntity> maybe = taskRepository.findById(id);
-                    assertThat(maybe).isPresent();
-                    assertThat(maybe.get().getAttempts()).isGreaterThanOrEqualTo(2); // proof of re-enqueue, reclaim, etc.
-                });*/
     }
 }

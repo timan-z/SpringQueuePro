@@ -7,6 +7,8 @@ import com.springqprobackend.springqpro.mapper.TaskMapper;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.repository.TaskRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -82,6 +84,10 @@ public class ProcessingService {
     private final TaskMapper taskMapper;
     private final ScheduledExecutorService scheduler;   // Handles micro-level retry scheduling — backoff logic for failed tasks only.
     private final QueueService queueService; // to re-enqueue by id when scheduling retries
+
+    @PersistenceContext
+    private EntityManager em;   // 2025-11-17-DEBUG: Need this for flush() and refresh(), which is professionally commonplace when working with Spring to enforce ordering.
+
     // Constructor(s):
     @Lazy
     public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, TaskMapper taskMapper, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueService queueService) {
@@ -109,6 +115,10 @@ public class ProcessingService {
             logger.warn("[ProcessingService] claim for {} failed (transition returned 0) — likely status mismatch", taskId);
             return; // Claim failed: already claimed or status has been changed.
         }
+
+        em.flush();
+        em.refresh(current);
+
         // Re-fetch the fresh TaskEntity now that we claimed it
         TaskEntity claimed = taskRepository.findById(taskId).orElse(null);
         if (claimed == null) return;
@@ -136,6 +146,10 @@ public class ProcessingService {
             model.setStatus(TaskStatus.FAILED);
             taskMapper.updateEntity(model, claimed);
             taskRepository.save(claimed);
+
+            em.flush();
+            em.refresh(claimed);
+
             if (claimed.getAttempts() < claimed.getMaxRetries()) {
                 long delayMs = computeBackoffMs(claimed.getAttempts());
                 /* 2025-11-17-DEBUG: OKAY, it looks like I spotted a massive architectural flaw inside my processAndClaim() logic.
