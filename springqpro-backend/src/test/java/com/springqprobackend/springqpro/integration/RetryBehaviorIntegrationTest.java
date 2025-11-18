@@ -31,6 +31,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/* DESCRIPTION OF THIS TEST CASE:
+- Ensures that a Handler that is marked to fail (FailHandler is overridden so its handle() method throws immediately)
+causes ProcessingService to schedule a retry (and that attempts are incremented, which basically serves as proof).
+- FailHandler is overridden so its handle() method throws immediately, this was done for deterministic test behavior.
+*/
+
 /* NOTE(S)-TO-SELF:
 - @TestConfiguration is a specialized version of @Configuration designed specifically for defining beans
 and customizations in a test environment. Meant to provide test-specific configurations without interfering
