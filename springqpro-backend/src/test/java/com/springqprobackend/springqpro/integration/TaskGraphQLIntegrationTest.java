@@ -1,5 +1,8 @@
 package com.springqprobackend.springqpro.integration;
 
+import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +23,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
@@ -56,7 +60,7 @@ public class TaskGraphQLIntegrationTest {
 
     // 2025-11-19-DEBUG:+NOTE: ADDED THE TWO CLASSES BELOW TO FIX THE I/O ERRORS I'M GETTING WHERE THREADS PROCESS POST-SHUTDOWN.
     // EDIT: THEY DON'T WORK.
-    @TestConfiguration
+    /*@TestConfiguration
     static class TestConfig {
         @Bean
         @Qualifier("execService")
@@ -98,7 +102,8 @@ public class TaskGraphQLIntegrationTest {
         @Override public boolean isShutdown() { return false; }
         @Override public boolean isTerminated() { return false; }
         @Override public boolean awaitTermination(long timeout, TimeUnit unit) { return true; }
-    }
+    }*/
+    // 2025-11-19-NOTE:+DEBUG: Removing my Executor overwrites because they're just adding new warnings and stuff (and I get the errors they're meant to prevent anyways).
 
     private GraphQlTester graphQlTester;
 
@@ -160,10 +165,10 @@ public class TaskGraphQLIntegrationTest {
         case)).
         - .execute() clearly runs it and you can inspect the fields.*/
         var created = graphQlTester.document(mutation)
-        .execute()
-        .path("createTask.payload").entity(String.class).isEqualTo("send-an-email")
-        .path("createTask.type").entity(String.class).isEqualTo("EMAIL")
-        .path("createTask.status").entity(String.class).isEqualTo("QUEUED");
+            .execute()
+            .path("createTask.payload").entity(String.class).isEqualTo("send-an-email")
+            .path("createTask.type").entity(String.class).isEqualTo("EMAIL")
+            .path("createTask.status").entity(String.class).isEqualTo("QUEUED");
         // Extract the id from the same GraphQL mutation:
         String id = graphQlTester.document(mutation)
                 .execute()
@@ -185,4 +190,126 @@ public class TaskGraphQLIntegrationTest {
                 .path("task.type").entity(String.class).isEqualTo("EMAIL");
     }
 
+    // Test #2 - Update Task (Partially), Verify Change in DB, Query Returns Updated:
+    @Test
+    void updateTask_verifyDBChange_retrieveByQuery() {
+        TaskEntity entity = new TaskEntity(
+                "Task-ArbitraryTaskId",
+                "Send an email",
+                TaskType.EMAIL,
+                TaskStatus.QUEUED,
+                0,
+                3,
+                Instant.now()
+        );
+        taskRepository.save(entity);
+        // Manually change the status of entity to COMPLETED and increment attempts:
+        // NOTE: When you want to specify integer in mutation, put %d -- "%d" will return you a integer wrapped in a String (aka just a String)
+        String mutation = """
+                mutation {
+                    updateTask(input:{
+                        id:"%s",
+                        status:COMPLETED,
+                        attempts:%d
+                    }) {
+                        id
+                        status
+                        attempts
+                    }
+                }
+                """.formatted(entity.getId(), entity.getAttempts()+1);
+        graphQlTester.document(mutation).execute()
+                .path("updateTask.status").entity(String.class).isEqualTo("COMPLETED")
+                .path("updateTask.attempts").entity(Integer.class).isEqualTo(1);
+        // Verify that the change happened in the DataBase w/ taskRepository:
+        TaskEntity getEntity = taskRepository.findById(entity.getId()).orElseThrow();
+        assert getEntity.getStatus() == TaskStatus.COMPLETED;
+        assert getEntity.getAttempts() == entity.getAttempts() + 1;
+    }
+
+    // Test #3 - Delete Task, Verify Change in DB, Query Returns NULL (or whatever):
+    @Test
+    void deleteTask_verifyDBChange_queryRetrieveNull() {
+        TaskEntity entity = new TaskEntity(
+                "Task-ArbitraryTaskId",
+                "Send an email",
+                TaskType.EMAIL,
+                TaskStatus.QUEUED,
+                0,
+                3,
+                Instant.now()
+        );
+        taskRepository.save(entity);
+        String mutation = """
+                mutation {
+                    deleteTask(id:"%s")
+                }
+                """.formatted(entity.getId());
+        graphQlTester.document(mutation)
+                .execute()
+                .path("deleteTask").entity(Boolean.class).isEqualTo(true);
+        assert taskRepository.findById(entity.getId()).isEmpty();
+    }
+
+    // Test #4 - Being able to filter Tasks w/ Status:
+    @Test
+    void filterTasks_byStatusQuery_returnsCorrectList() {
+        // Task #1:
+        taskRepository.save(
+                new TaskEntity("Task-ArbitraryTaskId-1","Send an email", TaskType.EMAIL, TaskStatus.QUEUED, 0, 3, Instant.now())
+        );
+        // Task #2:
+        taskRepository.save(
+                new TaskEntity("Task-ArbitraryTaskId-2", "Send an email 2", TaskType.EMAIL, TaskStatus.COMPLETED, 1, 3, Instant.now())
+        );
+        // Task #3:
+        taskRepository.save(
+                new TaskEntity("Task-ArbitaryTaskId-3", "Send an SMS or whatever", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now())
+        );
+        String query = """
+                query {
+                    tasks(status: QUEUED) {
+                        id
+                        payload
+                        status
+                    }
+                }
+                """;
+        graphQlTester.document(query)
+                .execute()
+                .path("tasks").entityList(TaskEntity.class).hasSize(2);
+    }
+
+    // Test #5 - Being able to filter Tasks w/ Type:
+    @Test
+    void filterTasks_byTypeQuery_returnsCorrectList() {
+        // Task #1:
+        taskRepository.save(
+                new TaskEntity("Task-ArbitraryTaskId-1","Do something NEWSLETTER related, I don't know.", TaskType.NEWSLETTER, TaskStatus.QUEUED, 0, 3, Instant.now())
+        );
+        // Task #2:
+        taskRepository.save(
+                new TaskEntity("Task-ArbitraryTaskId-2", "Do something NEWSLETTER related, I don't know 2.", TaskType.NEWSLETTER, TaskStatus.COMPLETED, 1, 3, Instant.now())
+        );
+        // Task #3:
+        taskRepository.save(
+                new TaskEntity("Task-ArbitraryTaskId-3", "Send an SMS or whatever", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now())
+        );
+        // Task #4:
+        taskRepository.save(
+                new TaskEntity("Task-ArbitraryTaskId-4", "Do something NEWSLETTER related, I don't know 3.", TaskType.NEWSLETTER, TaskStatus.QUEUED, 0, 3, Instant.now())
+        );
+        String query = """
+                query {
+                    tasksType(type: NEWSLETTER) {
+                        id
+                        payload
+                        status
+                    }
+                }
+                """;
+        graphQlTester.document(query)
+                .execute()
+                .path("tasksType").entityList(TaskEntity.class).hasSize(3);
+    }
 }

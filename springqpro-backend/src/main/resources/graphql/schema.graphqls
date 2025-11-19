@@ -56,6 +56,10 @@ type Query {
     """
     tasks(status:TaskStatus): [Task!]!
     """
+    For retrieving tasks w/ option to pass TaskType to filter. Returned value must bare-minimum be an empty list (of non-NULL Tasks).
+    """
+    tasksType(type:TaskType): [Task!]!
+    """
     Retrieving a single task given ID:
     """
     task(id: ID!): Task

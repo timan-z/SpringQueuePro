@@ -63,6 +63,12 @@ public class TaskService {
         if (status == null) return repository.findAll();
         return repository.findByStatus(status);
     }
+    /* 2025-11-19-NOTE: I don't know why I didn't add this before, but I should definitely have the option
+    to getAllTasks via TaskType type as well, so I'm going to overload the method above. */
+    public List<TaskEntity> getAllTasks(TaskType type) {
+        if(type == null) return repository.findAll();
+        return repository.findByType(type);
+    }
 
     public Optional<TaskEntity> getTask(String id) {
         return repository.findById(id); // Optional basically means this value may or may not exist.

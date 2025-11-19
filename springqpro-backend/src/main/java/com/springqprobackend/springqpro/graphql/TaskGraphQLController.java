@@ -45,6 +45,8 @@ public class TaskGraphQLController {
     public List<TaskEntity> tasks(@Argument TaskStatus status) {
         return taskService.getAllTasks(status);
     }
+    @QueryMapping
+    public List<TaskEntity> tasksType(@Argument TaskType type) { return taskService.getAllTasks(type); }    // <-- 2025-11-19-DEBUG: ADDITION.
 
     @QueryMapping
     public TaskEntity task(@Argument String id) {

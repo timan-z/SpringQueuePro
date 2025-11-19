@@ -2,6 +2,7 @@ package com.springqprobackend.springqpro.repository;
 
 import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.enums.TaskType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -40,6 +41,7 @@ public interface TaskRepository extends JpaRepository<TaskEntity, String> {
     -- Spring would read the line below as "SLEECT * FROM tasks WHERE status = ?" (REMEMBER THIS!)
     */
     List<TaskEntity> findByStatus(TaskStatus status);
+    List<TaskEntity> findByType(TaskType type); // <-- 2025-11-19-DEBUG: I don't know why I'm only adding this now.
 
     /*
     worker tries to claim e.g., via transitionStatus(id, QUEUED, INPROGRESS, currentAttempts+1).
