@@ -5,11 +5,8 @@ import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
-import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.repository.TaskRepository;
-import com.springqprobackend.springqpro.service.QueueService;
 import com.springqprobackend.springqpro.service.TaskService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,16 +17,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 import java.time.Duration;
-import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /* DESCRIPTION OF THIS TEST CASE:
 - Ensures that a Handler that is marked to fail (FailHandler is overridden so its handle() method throws immediately)

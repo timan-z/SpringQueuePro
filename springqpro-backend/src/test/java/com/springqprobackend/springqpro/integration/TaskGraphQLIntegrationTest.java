@@ -6,12 +6,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.graphql.test.tester.GraphQlTester;
 import org.springframework.graphql.test.tester.HttpGraphQlTester;
-import org.springframework.graphql.test.tester.WebGraphQlTester;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -26,10 +27,10 @@ Java objects (like String, Integer, custom stuff) and assert values using a flue
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 public class TaskGraphQLIntegrationTest {
-    @Autowired
-    private WebTestClient webTestClient;
-
     private GraphQlTester graphQlTester;
+
+    @LocalServerPort
+    private int port;
 
     @Autowired
     private TaskRepository taskRepository;
@@ -49,7 +50,15 @@ public class TaskGraphQLIntegrationTest {
     @BeforeEach
     void init() {
         taskRepository.deleteAll();
-        this.graphQlTester = HttpGraphQlTester.create(webTestClient);
+        WebTestClient client = WebTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/graphql")
+                .exchangeStrategies(
+                        ExchangeStrategies.builder()
+                                .codecs(c -> c.defaultCodecs().maxInMemorySize(5_000_000))
+                                .build()
+                )
+                .build();
+        this.graphQlTester = HttpGraphQlTester.create(client);
     }
 
     // Test #1 - Create Task, Query the Task, then verify its Status, Type, and Payload:
@@ -70,17 +79,18 @@ public class TaskGraphQLIntegrationTest {
                     }
                 }
                 """;
-        /* 2025-11-17-NOTE(S)-TO-SELF:+DEBUG:
-        - graphQlTester.document(mutation) prepares a GraphQL mutation with String mutation, which is just a String containing
-        a proper GraphQL mutation obv. So graphQlTester runs it by running my actual Spring Boot app (which runs my real
-        GraphQL controller, my real service layer, and uses the real database (Testcontainers in this case)).
-        - .execute() clearly runs it and you can inspect the fields.
-        */
+        /*2025 - 11 - 17 - NOTE(S) - TO - SELF:+DEBUG:
+        -graphQlTester.document(mutation) prepares a GraphQL mutation with String mutation, which is just a String
+        containing
+        a proper GraphQL mutation obv.So graphQlTester runs it by running my actual Spring Boot app(which runs my real
+                GraphQL controller, my real service layer, and uses the real database(Testcontainers in this
+        case)).
+        - .execute() clearly runs it and you can inspect the fields.*/
         var created = graphQlTester.document(mutation)
-                .execute()
-                .path("createTask.payload").entity(String.class).isEqualTo("send-an-email")
-                .path("createTask.type").entity(String.class).isEqualTo("EMAIL")
-                .path("createTask.status").entity(String.class).isEqualTo("QUEUED");
+        .execute()
+        .path("createTask.payload").entity(String.class).isEqualTo("send-an-email")
+        .path("createTask.type").entity(String.class).isEqualTo("EMAIL")
+        .path("createTask.status").entity(String.class).isEqualTo("QUEUED");
         // Extract the id from the same GraphQL mutation:
         String id = graphQlTester.document(mutation)
                 .execute()
