@@ -1,10 +1,55 @@
-name: Test Trigger
+name: Backend CI
 
 on:
   push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  run:
+  build-and-test:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:18
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd="pg_isready -U test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: false
+      DOCKER_HOST: unix:///var/run/docker.sock
+
     steps:
-      - run: echo "Triggered!"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '24'
+          cache: maven
+
+      - name: Install Docker (needed for Testcontainers)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          docker info
+
+      - name: Run Tests (Unit + Integration)
+        run: mvn -B clean verify
+        working-directory: ./springqpro-backend
