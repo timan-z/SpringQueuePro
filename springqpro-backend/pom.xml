@@ -97,14 +97,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Testcontainers for running Postgres locally with Docker.  -->
-        <!--<dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>1.21.3</version>
-            <scope>test</scope>
-        </dependency>-->
-        <!-- Just adding this to suppress a mostly benign warning I get from the testcontainers dependency above. (EDIT: the one above the commented out one now too). -->
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
