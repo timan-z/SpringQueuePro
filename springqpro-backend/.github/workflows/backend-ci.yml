@@ -1,0 +1,45 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Run Unit + Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      docker:
+        image: docker:29.0.2-dind
+        privileged: true
+
+    steps:
+      - name: Checkout
+        uses: action/checkout@v4
+
+      - name: Set up JDK 24
+        uses: actions/setup-java@v4
+        with:
+          java-version: '24'
+          distribution: 'temurin'
+
+      - name: Cache Maven repository
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      # IMPORTANT: GitHub Actions + Testcontainers workaround.
+      # Prevents random failures involving cgroups / new Docker runtimes.
+      - name: Configure Testcontainers environment
+        run: |
+          echo "TESTCONTAINERS_RYUK_DISABLED=true" >> $GITHUB_ENV
+          echo "TC_HOST=localhost" >> $GITHUB_ENV
+
+      - name: Run Tests (Unit + Integration)
+        run: mvn -B clean verify
