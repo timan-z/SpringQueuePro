@@ -40,3 +40,4 @@ jobs:
       # Run Unit + Integration Tests
       - name: Run tests
         run: mvn -B clean verify
+        working-directory: ./springqpro-backend
