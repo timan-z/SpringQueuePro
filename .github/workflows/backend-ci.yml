@@ -28,12 +28,8 @@ jobs:
           java-version: '24'
           cache: maven
 
-      - name: Install Docker (needed for Testcontainers)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io
-          sudo systemctl start docker
-          docker info
+      - name: Verify Docker available
+        run: docker info
 
       - name: Run Tests (Unit + Integration)
         run: mvn -B clean verify
