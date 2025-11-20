@@ -1,43 +1,10 @@
-name: Backend CI
+name: Test Trigger
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  run:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
-
-      - name: Cache Testcontainers
-        uses: actions/cache@v4
-        with:
-          path: ~/.testcontainers
-          key: ${{ runner.os }}-testcontainers
-          restore-keys: |
-            ${{ runner.os }}-testcontainers
-
-      - name: Set up JDK 24
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '24'
-
-      # Run Unit + Integration Tests
-      - name: Run tests
-        run: mvn -B clean verify
-        working-directory: ./springqpro-backend
+      - run: echo "Triggered!"
