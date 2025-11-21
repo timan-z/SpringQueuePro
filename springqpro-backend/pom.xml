@@ -109,6 +109,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- REDIS: -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <!--<version>3.5.7</version>-->
+        </dependency>
+
         <!-- MISC: -->
         <!-- For waiting on async conditions during testing. -->
         <dependency>
