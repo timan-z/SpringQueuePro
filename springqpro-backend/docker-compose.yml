@@ -11,6 +11,15 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
+  redis:
+    image: redis:7-alpine # Chosen intentionally - 7 becase stable, alpine because smaller size (better for CI stuff and deployment on AWS eventually).
+    container_name: springqpro-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
 
 volumes:
   pgdata:
+  redis-data:

@@ -13,6 +13,22 @@ spring:
       hibernate:
         format_sql: true
 
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    timeout: 2000ms
+    lettuce:
+      pool:
+        enabled: true
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
+# Redis cache defaults for my Task entities.
+cache:
+  task:
+    ttl-seconds: 600  # 10 minutes
+
 graphql:
   graphiql:
     enabled: true  # enable in-browser GraphiQL UI

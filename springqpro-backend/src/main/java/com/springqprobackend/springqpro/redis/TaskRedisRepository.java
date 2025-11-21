@@ -1,0 +1,45 @@
+package com.springqprobackend.springqpro.redis;
+
+import com.springqprobackend.springqpro.domain.TaskEntity;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+
+// A thin cache abstraction. Keep logic here so you can change eviction/format later.
+// Note: We cache TaskEntity (DB representation) rather than domain Task. This fits DDD: cache the authoritative persisted shape.
+
+/* 2025-11-21-REDIS-PHASE-NOTE:
+- This file is a thin cache abstraction.
+- We'll be caching TaskEntity (DB representation, not domain Task). This is good DDD (Domain-Driven Design): Cache the authoritative persisted shape.
+*/
+@Component
+public class TaskRedisRepository {
+    // Field(s):
+    private static final String TASK_KEY_PREFIX = "task:";
+    private final RedisTemplate<String, Object> redis;
+    private final Duration ttl;
+    // Constructor(s):
+    public TaskRedisRepository(RedisTemplate<String, Object> redis, @Value("${cache.task.ttl-seconds:600}") long ttlSeconds) {
+        this.redis = redis;
+        this.ttl = Duration.ofSeconds(ttlSeconds);
+    }
+    // Method(s):
+    private String key(String id) {
+        return TASK_KEY_PREFIX + id;
+    }
+    public void put(TaskEntity entity) {
+        if(entity == null || entity.getId() == null) return;
+        redis.opsForValue().set(key(entity.getId()), entity, ttl);
+    }
+    public TaskEntity get(String id) {
+        Object o = redis.opsForValue().get(key(id));
+        if(o instanceof TaskEntity) return (TaskEntity) o;
+        return null;
+    }
+    public void delete(String id) {
+        redis.delete(key(id));
+    }
+    // DEBUG:+NOTE:+TO-DO: I can add other methods like exists(), setIfAbsent() and so on...
+}
