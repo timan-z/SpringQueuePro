@@ -10,6 +10,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Wait for DB readiness
+        options: >-
+          --health-cmd="pg_isready -U postgres -d testdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,3 +48,6 @@ jobs:
         env:
           TESTCONTAINERS_RYUK_DISABLED: false
           TESTCONTAINERS_CHECKS_DISABLE: true
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
