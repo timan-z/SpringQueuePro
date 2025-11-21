@@ -8,6 +8,7 @@ import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.service.TaskService;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +87,12 @@ class RetryBehaviorIntegrationTest extends IntegrationTestBase {
             };
         }
     }
+
+    @BeforeEach
+    void cleanDb() {
+        taskRepository.deleteAll();
+    }
+
     // 2025-11-17-DEBUG: Renaming the Test name. (Checking that it's QUEUED is more accurate than checking if it's FAILED).
     @Test
     void failingTask_isRequeued_andRetryScheduled() {

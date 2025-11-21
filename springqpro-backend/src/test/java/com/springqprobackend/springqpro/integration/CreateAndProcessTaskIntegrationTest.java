@@ -4,6 +4,7 @@ import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -56,24 +57,16 @@ public void sweepQueuedTasks() {
 //@Testcontainers
 //@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
-    // NOTE: All the values provided below are just the arbitrary ones from docker_compose.yml:
-    /*@Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18")
-            .withDatabaseName("springqpro")
-            .withUsername("springqpro")
-            .withPassword("springqpro");
-
-    @DynamicPropertySource
-    static void overrideProps(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-    }*/
     @Autowired
     private TestRestTemplate rest;
 
     @Autowired
     private TaskRepository taskRepository;
+
+    @BeforeEach
+    void cleanDb() {
+        taskRepository.deleteAll();
+    }
 
     @Test
     void createTask_isPersisted_andEventuallyProcessed() {

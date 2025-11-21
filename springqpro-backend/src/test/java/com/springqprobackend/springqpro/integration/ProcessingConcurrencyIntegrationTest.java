@@ -6,6 +6,7 @@ import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.service.ProcessingService;
 import com.springqprobackend.springqpro.service.TaskService;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
+import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,24 +58,17 @@ GRAPHQL-RELATED QUERIES:
 class ProcessingConcurrencyIntegrationTest extends IntegrationTestBase {
     // Field(s):
     private static final Logger logger = LoggerFactory.getLogger(ProcessingConcurrencyIntegrationTest.class);
-    /*@Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18")
-            .withDatabaseName("springqpro")
-            .withUsername("springqpro")
-            .withPassword("springqpro");
-
-    @DynamicPropertySource
-    static void overrideProps(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-    }*/
     @Autowired
     private TaskService taskService;
     @Autowired
     private TaskRepository taskRepository;
     @Autowired
     private ProcessingService processingService;
+
+    @BeforeEach
+    void cleanDb() {
+        taskRepository.deleteAll();
+    }
 
     @Test
     void twoThreads_tryToClaim_sameTask_onlyOneSucceeds() throws InterruptedException, ExecutionException {
