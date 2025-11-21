@@ -7,6 +7,7 @@ import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.service.TaskService;
+import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,14 +49,14 @@ And if no such bean exists, it will create a new instance of the bean and then w
 with it directly in your test methods. [And all of this on @SpyBean was taken from Google AI Overview, but seems legit]
 */
 // 2025-11-17-EDIT: This Test Case is poorly implemented and won't work because it don't account for my backoffMs delay thing in ProcessingService.java !!!
-@Testcontainers
+//@Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "spring.main.allow-bean-definition-overriding=true")
-public class RetryBehaviorIntegrationTest {
+class RetryBehaviorIntegrationTest extends IntegrationTestBase {
     // Field(s):
     private static final Logger logger = LoggerFactory.getLogger(RetryBehaviorIntegrationTest.class);
 
     // NOTE: All the values provided below are just the arbitrary ones from docker_compose.yml:
-    @Container
+    /*@Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18")
             .withDatabaseName("springqpro")
             .withUsername("springqpro")
@@ -66,7 +67,7 @@ public class RetryBehaviorIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-    }
+    }*/
 
     @Autowired
     private TaskService taskService;

@@ -5,6 +5,7 @@ import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.service.ProcessingService;
 import com.springqprobackend.springqpro.service.TaskService;
+import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,13 +52,12 @@ GRAPHQL-RELATED QUERIES:
 - Mutation for creating tasks
 - Testing n+1 fetches mitigated by DataLoader (maybe if integrated).
 */
-@Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-public class ProcessingConcurrencyIntegrationTest {
+//@Testcontainers
+//@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+class ProcessingConcurrencyIntegrationTest extends IntegrationTestBase {
     // Field(s):
     private static final Logger logger = LoggerFactory.getLogger(ProcessingConcurrencyIntegrationTest.class);
-
-    @Container
+    /*@Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18")
             .withDatabaseName("springqpro")
             .withUsername("springqpro")
@@ -68,8 +68,7 @@ public class ProcessingConcurrencyIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-    }
-
+    }*/
     @Autowired
     private TaskService taskService;
     @Autowired

@@ -4,6 +4,7 @@ import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.repository.TaskRepository;
+import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,10 +54,18 @@ BECAUSE IT'S JUST A TEST THING AND I REALLY WANT TO FINISH THIS PROJECT BEFORE T
 I DON'T HAVE TIME FOR THIS.
 TO-DO: FIX THIS PROBLEM PLEASE FOR THE LOVE OF GOD.
 */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-public class TaskGraphQLIntegrationTest {
+//@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+//@Testcontainers
+//@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {
+                "app.queue.processing.enabled=false",
+                "spring.task.scheduling.enabled=false",
+                "spring.main.allow-bean-definition-overriding=true"
+        }
+)
+class TaskGraphQLIntegrationTest extends IntegrationTestBase {
 
     // 2025-11-19-DEBUG:+NOTE: ADDED THE TWO CLASSES BELOW TO FIX THE I/O ERRORS I'M GETTING WHERE THREADS PROCESS POST-SHUTDOWN.
     // EDIT: THEY DON'T WORK.
@@ -113,7 +122,7 @@ public class TaskGraphQLIntegrationTest {
     @Autowired
     private TaskRepository taskRepository;
 
-    @Container
+    /*@Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18")
             .withDatabaseName("springqpro")
             .withUsername("springqpro")
@@ -124,7 +133,7 @@ public class TaskGraphQLIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-    }
+    }*/
     @BeforeEach
     void init() {
         taskRepository.deleteAll();

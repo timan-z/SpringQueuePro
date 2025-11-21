@@ -3,6 +3,7 @@ package com.springqprobackend.springqpro.integration;
 import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.repository.TaskRepository;
+import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -52,12 +53,11 @@ public void sweepQueuedTasks() {
 3. Waits (w/ Awaitility) for the DB row to become COMPLETED verifying that the ProcessingService ran and handler executed, status persisted.
 - Uses Awaitility to wait for ProcessingService's asynchronous processing.
 */
-@Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public class CreateAndProcessTaskIntegrationTest {
-
+//@Testcontainers
+//@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
     // NOTE: All the values provided below are just the arbitrary ones from docker_compose.yml:
-    @Container
+    /*@Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18")
             .withDatabaseName("springqpro")
             .withUsername("springqpro")
@@ -68,8 +68,7 @@ public class CreateAndProcessTaskIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-    }
-
+    }*/
     @Autowired
     private TestRestTemplate rest;
 

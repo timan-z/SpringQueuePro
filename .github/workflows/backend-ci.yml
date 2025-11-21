@@ -2,35 +2,32 @@ name: Backend CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    env:
-      TESTCONTAINERS_RYUK_DISABLED: false
-      DOCKER_HOST: unix:///var/run/docker.sock
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '24'
+          distribution: temurin
+          java-version: 21
           cache: maven
 
-      - name: Verify Docker available
-        run: docker info
+      - name: Enable Testcontainers container reuse
+        run: |
+          mkdir -p ~/.testcontainers
+          echo 'testcontainers.reuse.enable=true' > ~/.testcontainers.properties
 
-      - name: Run Tests (Unit + Integration)
+      - name: Build & test
         run: mvn -B clean verify
-        working-directory: ./springqpro-backend
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: false
+          TESTCONTAINERS_CHECKS_DISABLE: true
