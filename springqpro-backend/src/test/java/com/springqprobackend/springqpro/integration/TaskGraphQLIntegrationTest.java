@@ -8,25 +8,16 @@ import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Bean;
 import org.springframework.graphql.test.tester.GraphQlTester;
 import org.springframework.graphql.test.tester.HttpGraphQlTester;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.*;
 
 /* 2025-11-17-NOTE(S)-TO-SELF:
@@ -61,58 +52,12 @@ TO-DO: FIX THIS PROBLEM PLEASE FOR THE LOVE OF GOD.
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "app.queue.processing.enabled=false",
-                "spring.task.scheduling.enabled=false",
-                "spring.main.allow-bean-definition-overriding=true"
+                "spring.task.scheduling.enabled=false"
         }
 )
+@ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 class TaskGraphQLIntegrationTest extends IntegrationTestBase {
-
-    // 2025-11-19-DEBUG:+NOTE: ADDED THE TWO CLASSES BELOW TO FIX THE I/O ERRORS I'M GETTING WHERE THREADS PROCESS POST-SHUTDOWN.
-    // EDIT: THEY DON'T WORK.
-    /*@TestConfiguration
-    static class TestConfig {
-        @Bean
-        @Qualifier("execService")
-        public ExecutorService queueExecutorOverride() {
-            return new DirectExecutorService();
-        }
-        @Bean
-        @Qualifier("schedExec")
-        public ScheduledExecutorService schedulerOverride() {
-            return new ScheduledThreadPoolExecutor(1) {
-                @Override
-                public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
-                    // run immediately in tests
-                    command.run();
-                    return null;
-                }
-
-                @Override
-                public void shutdown() {}
-                @Override
-                public List<Runnable> shutdownNow() { return Collections.emptyList(); }
-                @Override
-                public boolean isShutdown() { return false; }
-                @Override
-                public boolean isTerminated() { return false; }
-                @Override
-                public boolean awaitTermination(long timeout, TimeUnit unit) { return true; }
-            };
-        }
-    }
-
-    private static class DirectExecutorService extends AbstractExecutorService {
-        @Override
-        public void execute(Runnable command) {
-            command.run();  // run immediately, same thread.
-        }
-        @Override public void shutdown() {}
-        @Override public List<Runnable> shutdownNow() { return Collections.emptyList(); }
-        @Override public boolean isShutdown() { return false; }
-        @Override public boolean isTerminated() { return false; }
-        @Override public boolean awaitTermination(long timeout, TimeUnit unit) { return true; }
-    }*/
-    // 2025-11-19-NOTE:+DEBUG: Removing my Executor overwrites because they're just adding new warnings and stuff (and I get the errors they're meant to prevent anyways).
 
     private GraphQlTester graphQlTester;
 
@@ -122,18 +67,6 @@ class TaskGraphQLIntegrationTest extends IntegrationTestBase {
     @Autowired
     private TaskRepository taskRepository;
 
-    /*@Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18")
-            .withDatabaseName("springqpro")
-            .withUsername("springqpro")
-            .withPassword("springqpro");
-
-    @DynamicPropertySource
-    static void overrideProps(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-    }*/
     @BeforeEach
     void init() {
         taskRepository.deleteAll();
