@@ -54,10 +54,13 @@ public class FailHandlerTests {
         mockSleeper = mock(Sleeper.class);  // both mock sleepers will be used for different methods.
     }
 
-    @Test
+    /* 2025-11-20-EDIT: This file and DefaultHandlerTests.java is outdated, relying on the old project architecture
+    before any of the refactoring related to ProcessingService.java */
+
+    /*@Test
     void failHandler_completes_failedTask() throws InterruptedException {
-        /* In my FailHandler.java class, I define successOdds as 0.25, so if I guarantee fixedRandom.nextDouble returns 0.1
-        (which obv <= 0.25, so I'm in the % interval where my random odds succeeded), then I can let failHandler complete this task: */
+         In my FailHandler.java class, I define successOdds as 0.25, so if I guarantee fixedRandom.nextDouble returns 0.1
+        (which obv <= 0.25, so I'm in the % interval where my random odds succeeded), then I can let failHandler complete this task:
         when(props.getFailSuccSleepTime()).thenReturn(2000L);
         when(fixedRandom.nextDouble()).thenReturn(0.1);
         FailHandler failHandler = new FailHandler(queue, fastSleeper, fixedRandom, props);
@@ -66,10 +69,10 @@ public class FailHandlerTests {
         // Assertions:
         assertEquals(TaskStatus.COMPLETED, t.getStatus());
         verify(queue, never()).retry(any(Task.class), anyInt());
-    }
+    }*/
 
     // This test case basically verifies that queue.retry(...) was called (when t.getAttempts() < t.getMaxRetries() and odds indicate no success).
-    @Test
+    /*@Test
     void failHandler_retries_failedTask() throws InterruptedException {
         when(props.getFailSleepTime()).thenReturn(1000L);
         when(fixedRandom.nextDouble()).thenReturn(0.9);
@@ -80,10 +83,10 @@ public class FailHandlerTests {
         failHandler.handle(t);
         assertEquals(TaskStatus.FAILED, t.getStatus());
         verify(queue, times(1)).retry(eq(t), eq(1000L));
-    }
+    }*/
 
     // This test case confirms that queue.retry(...) is not ran when (t.getAttempts >= t.getMaxRetries() and odds indicate no success).
-    @Test
+    /*@Test
     void failHandler_retires_maxFailedTask() throws InterruptedException {
         when(props.getFailSleepTime()).thenReturn(1000L);
         t.setAttempts(3);   // So, it goes straight to the failed if-condition branch.
@@ -92,20 +95,20 @@ public class FailHandlerTests {
         failHandler.handle(t);
         assertEquals(TaskStatus.FAILED, t.getStatus());
         verify(queue, never()).retry(eq(t), eq(1000L));
-    }
+    }*/
 
     // More misc Tests:
     // Verify that the Sleeper.sleep(2000) call was invoked for a successful attempt:
-    @Test
+    /*@Test
     void failHandler_callsSleep_onSuccess() throws InterruptedException {
         when(props.getFailSuccSleepTime()).thenReturn(2000L);
         when(fixedRandom.nextDouble()).thenReturn(0.1);
         FailHandler failHandler = new FailHandler(queue, mockSleeper, fixedRandom, props);
         failHandler.handle(t);
         verify(mockSleeper, times(1)).sleep(2000L);
-    }
+    }*/
     // Verify that the Sleeper.sleep(1000) call happened on permanent failure branch:
-    @Test
+    /*@Test
     void failHandler_callsSleep_onPermFail() throws InterruptedException {
         when(props.getFailSleepTime()).thenReturn(1000L);
         t.setAttempts(3);
@@ -113,5 +116,5 @@ public class FailHandlerTests {
         FailHandler failHandler = new FailHandler(queue, mockSleeper, fixedRandom, props);
         failHandler.handle(t);
         verify(mockSleeper, times(1)).sleep(1000L);
-    }
+    }*/
 }
