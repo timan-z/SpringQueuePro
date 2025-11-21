@@ -28,6 +28,7 @@ jobs:
 
       - name: Build & test
         run: mvn -B clean verify
+        working-directory: ./springqpro-backend
         env:
           TESTCONTAINERS_RYUK_DISABLED: false
           TESTCONTAINERS_CHECKS_DISABLE: true
