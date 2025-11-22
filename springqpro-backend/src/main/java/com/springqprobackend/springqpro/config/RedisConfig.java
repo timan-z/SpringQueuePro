@@ -1,4 +1,4 @@
-/*package com.springqprobackend.springqpro.config;
+package com.springqprobackend.springqpro.config;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
@@ -42,4 +42,3 @@ public class RedisConfig {
         return template;
     }
 }
-*/

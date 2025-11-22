@@ -1,4 +1,4 @@
-/*package com.springqprobackend.springqpro.testcontainers;
+package com.springqprobackend.springqpro.testcontainers;
 
 import com.springqprobackend.springqpro.config.RedisTestConfig;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -23,4 +23,4 @@ public abstract class RedisIntegrationTestBase extends BaseRedisContainer {
         registry.add("spring.redis.host", REDIS::getHost);
         registry.add("spring.redis.port", () -> REDIS.getMappedPort(6379));
     }
-}*/
+}
