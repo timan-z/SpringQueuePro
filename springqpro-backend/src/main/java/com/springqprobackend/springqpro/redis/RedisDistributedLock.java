@@ -13,7 +13,7 @@ import java.util.UUID;
 - How to use: String token = lock.tryLock("task:lock:"+id, 10000); if(token!=null){ try { ... } finally { lock.unlock(...); } }
 SO BASICALLY, safe lock happens using SET NX PX, and we use a Lua script to unlock it. That's how this is going to work.
 */
-@Component
+/*@Component
 public class RedisDistributedLock {
     // Field(s):
     private final RedisTemplate<String, Object> redis;
@@ -42,3 +42,4 @@ public class RedisDistributedLock {
         return res != null && res > 0;
     }
 }
+*/

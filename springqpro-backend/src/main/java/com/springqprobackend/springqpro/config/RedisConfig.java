@@ -1,10 +1,11 @@
-package com.springqprobackend.springqpro.config;
+/*package com.springqprobackend.springqpro.config;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,11 +15,12 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 // 2025-11-21-REDIS-PHASE-NOTE: THIS FILE CREATES CONNECTION FACTORY AND REDIS TEMPLATE W/ JACKSON SERIALIZER:
 @Configuration
+@Profile("!test")
 public class RedisConfig {
     @Bean
     public LettuceConnectionFactory redisConnectionFactory(
             @Value("${spring.redis.host}") String host,
-            @Value("${spring.redis.port") int port
+            @Value("${spring.redis.port}") int port
     ) {
         RedisStandaloneConfiguration cfg = new RedisStandaloneConfiguration(host, port);
         return new LettuceConnectionFactory(cfg);
@@ -40,3 +42,4 @@ public class RedisConfig {
         return template;
     }
 }
+*/

@@ -14,7 +14,7 @@ import java.time.Duration;
 - This file is a thin cache abstraction.
 - We'll be caching TaskEntity (DB representation, not domain Task). This is good DDD (Domain-Driven Design): Cache the authoritative persisted shape.
 */
-@Component
+/*@Component
 public class TaskRedisRepository {
     // Field(s):
     private static final String TASK_KEY_PREFIX = "task:";
@@ -43,3 +43,4 @@ public class TaskRedisRepository {
     }
     // DEBUG:+NOTE:+TO-DO: I can add other methods like exists(), setIfAbsent() and so on...
 }
+*/
