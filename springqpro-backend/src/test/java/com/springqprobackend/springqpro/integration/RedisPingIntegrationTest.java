@@ -37,25 +37,4 @@ class RedisPingIntegrationTest {
         String result = stringRedisTemplate.execute((RedisCallback<String>) (conn) -> conn.ping());
         assert result.equalsIgnoreCase("PONG");
     }
-    // OLD:
-    // Testcontainers Redis:
-    /*@Container
-    static final GenericContainer<?> REDIS =
-            new GenericContainer<>("redis:7.2")
-                    .withExposedPorts(6379);
-
-    // Register dynamic Spring properties BEFORE context starts
-    @DynamicPropertySource
-    static void configureRedis(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", () -> REDIS.getHost());
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
-    }
-
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
-    @Test
-    void testPing() {
-        String result = stringRedisTemplate.execute((RedisCallback<String>) (conn) -> conn.ping());
-        assert result.equalsIgnoreCase("PONG");
-    }*/
 }

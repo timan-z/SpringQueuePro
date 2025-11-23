@@ -4,6 +4,7 @@ import com.springqprobackend.springqpro.domain.TaskEntity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 
@@ -15,7 +16,7 @@ import java.time.Duration;
 - We'll be caching TaskEntity (DB representation, not domain Task). This is good DDD (Domain-Driven Design): Cache the authoritative persisted shape.
 */
 // NOTE:+DEBUG: During refactoring, I should clean things up and probably add this file to package repository instead of this "redis" package. (Avoided for now to keep integration simple).
-@Component
+@Repository
 public class TaskRedisRepository {
     // Field(s):
     private static final String TASK_KEY_PREFIX = "task:";
@@ -36,6 +37,7 @@ public class TaskRedisRepository {
     }
     public TaskEntity get(String id) {
         Object o = redis.opsForValue().get(key(id));
+        if(o == null || !(o instanceof TaskEntity)) return null;    // DEBUG: Maybe add logs too or something.
         if(o instanceof TaskEntity) return (TaskEntity) o;
         return null;
     }
