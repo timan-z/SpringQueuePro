@@ -116,6 +116,14 @@
             <!--<version>3.5.7</version>-->
         </dependency>
 
+        <!-- Pasting from: https://testcontainers.com/modules/redis/ -->
+        <dependency>
+            <groupId>com.redis</groupId>
+            <artifactId>testcontainers-redis</artifactId>
+            <version>2.2.2</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- MISC: -->
         <!-- For waiting on async conditions during testing. -->
         <dependency>
