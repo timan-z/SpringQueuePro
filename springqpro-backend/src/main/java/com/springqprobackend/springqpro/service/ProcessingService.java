@@ -6,6 +6,8 @@ import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import com.springqprobackend.springqpro.mapper.TaskMapper;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
+import com.springqprobackend.springqpro.redis.RedisDistributedLock;
+import com.springqprobackend.springqpro.redis.TaskRedisRepository;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -84,19 +86,25 @@ public class ProcessingService {
     private final TaskMapper taskMapper;
     private final ScheduledExecutorService scheduler;   // Handles micro-level retry scheduling — backoff logic for failed tasks only.
     private final QueueService queueService; // to re-enqueue by id when scheduling retries
+    private final RedisDistributedLock redisLock;   // 2025-11-23-DEBUG: REDIS INTEGRATION PHASE!
+    private final TaskRedisRepository cache;    // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java
 
     @PersistenceContext
     private EntityManager em;   // 2025-11-17-DEBUG: Need this for flush() and refresh(), which is professionally commonplace when working with Spring to enforce ordering.
 
     // Constructor(s):
     @Lazy
-    public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, TaskMapper taskMapper, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueService queueService) {
+    public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, TaskMapper taskMapper, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueService queueService, RedisDistributedLock redisLock, TaskRedisRepository cache) {
         this.taskRepository = taskRepository;
         this.handlerRegistry = handlerRegistry;
         this.taskMapper = taskMapper;
         this.scheduler = scheduler;
         this.queueService = queueService;
+        this.redisLock = redisLock;
+        this.cache = cache;
     }
+
+    // 2025-11-23-DEBUG: OVERHAULING MY claimAndProcess METHOD LOGIC [BELOW]:
     // Method for attempting to claim a Task and process it. This method coordinates DB-level claim and handler execution.
     // The retry doesn’t live inside the handler anymore — it’s a post-processing policy in ProcessingService. If it throws, the failure is caught in the ProcessingService try/catch block.
     @Transactional  // <-- forgot this, it should 100% be here.
@@ -123,6 +131,16 @@ public class ProcessingService {
         TaskEntity claimed = taskRepository.findById(taskId).orElse(null);
         if (claimed == null) return;
 
+        // 2025-11-23-DEBUG: OVERHAULING MY claimAndProcess METHOD LOGIC [1 - BELOW]:
+        String lockKey = "task:lock:" + taskId;
+        String token = redisLock.tryLock(lockKey, 2000);    // 2025-11-23-DEBUG:+TO-DO: Going to use 2000 for the processing time (that's what's in application.yml I think).
+        if(token == null) {
+            // NOTE: REDIS LOCK NOT WORKING MEANS, FOR SAFETY, I SHOULD SET STATUS OF TASK BACK TO QUEUED SO OTHER CONSUMERS CAN GET IT:
+            taskRepository.transitionStatus(taskId, TaskStatus.INPROGRESS, TaskStatus.QUEUED, claimed.getAttempts());
+            return;
+        }
+        // 2025-11-23-DEBUG: OVERHAULING MY claimAndProcess METHOD LOGIC [1 - ABOVE].
+
         // Convert to in-memory Task model for existing handlers (you can also change handlers to accept TaskEntity)
         // NOTE: Considered proper DDD Principle to NOT have Persistence Objects mix with my Handlers!
         Task model = taskMapper.toDomain(claimed);
@@ -130,15 +148,12 @@ public class ProcessingService {
         // try-catch-block to do the processing:
         try {
             TaskHandler handler = handlerRegistry.getHandler(model.getType().name());
-            if(handler == null) {
-                handler = handlerRegistry.getHandler("DEFAULT");
-            }
+            if(handler == null) handler = handlerRegistry.getHandler("DEFAULT");
             handler.handle(model);
             model.setStatus(TaskStatus.COMPLETED);
-            //model.setAttempts(model.getAttempts() + 1); <-- Also pretty sure I'm not supposed to have this. No idea why I added this.
-            //claimed.setStatus(TaskStatus.COMPLETED); <-- I'm an idiot on autopilot what was I doing here.
             taskMapper.updateEntity(model, claimed);    // 2025-11-15-EDIT: ADDED THIS!
             TaskEntity persisted = taskRepository.save(claimed);
+            cache.put(claimed); // 2025-11-23-DEBUG: REFACTORING FOR TaskRedisRepository.java
             logger.info("[ProcessingService] after save - id: {}, status: {}, attempts: {}, version: {}", persisted.getId(), persisted.getStatus(), persisted.getAttempts(), persisted.getVersion());
         } catch(Exception ex) {
             // ProcessingService catches Task FAILs gracefully - marking it as FAILED, persisting it, and re-enqueuing it with backoff.
@@ -146,6 +161,7 @@ public class ProcessingService {
             model.setStatus(TaskStatus.FAILED);
             taskMapper.updateEntity(model, claimed);
             taskRepository.save(claimed);
+            cache.put(claimed); // 2025-11-23-DEBUG: REFACTORING FOR TaskRedisRepository.java
 
             em.flush();
             em.refresh(claimed);
@@ -163,9 +179,12 @@ public class ProcessingService {
                 // permanent failure:
                 logger.error("Task failed permanently. DEBUG: Come and write a more detailed case here later I barely slept.");
             }
+        } finally {
+          redisLock.unlock(lockKey, token); // 2025-11-23-DEBUG: LAST ADDITION FOR TaskRedisRepository.java REFACTORING PHASE.
         }
         logger.info("[ProcessingService] finishing claimAndProcess for {} -> status now {}", taskId, claimed.getStatus());
     }
+    // 2025-11-23-DEBUG: OVERHAULING MY claimAndProcess METHOD LOGIC [ABOVE].
 
     /* NOTE: In my original setup from the ProtoType phase (SpringQueue), I had fixed times set for the Task processing
     time. For Tasks that FAIL, that's not the greatest idea (static and don't adapt to retries). It's more professional
