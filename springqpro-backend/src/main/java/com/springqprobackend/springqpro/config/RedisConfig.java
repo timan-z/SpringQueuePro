@@ -14,8 +14,8 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 // 2025-11-21-REDIS-PHASE-NOTE: THIS FILE CREATES CONNECTION FACTORY AND REDIS TEMPLATE W/ JACKSON SERIALIZER:
-@Configuration
 @Profile("!test")
+@Configuration
 public class RedisConfig {
     @Bean
     public LettuceConnectionFactory redisConnectionFactory(
