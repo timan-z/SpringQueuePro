@@ -1,6 +1,7 @@
 package com.springqprobackend.springqpro.redis;
 
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
@@ -16,10 +17,12 @@ SO BASICALLY, safe lock happens using SET NX PX, and we use a Lua script to unlo
 @Component
 public class RedisDistributedLock {
     // Field(s):
-    private final RedisTemplate<String, Object> redis;
+    //private final RedisTemplate<String, Object> redis;
+    private final StringRedisTemplate redis;
     private final DefaultRedisScript<Long> releaseScript;
     // Constructor(s):
-    public RedisDistributedLock(RedisTemplate<String, Object> redis) {
+    //public RedisDistributedLock(RedisTemplate<String, Object> redis) {
+    public RedisDistributedLock(StringRedisTemplate redis) {
         this.redis = redis;
         // [FOR UNLOCKING] -> Lua script: if redis.get(KEY)==ARGV[1] then del(KEY) return 1 else return 0 end.
         String lua =
