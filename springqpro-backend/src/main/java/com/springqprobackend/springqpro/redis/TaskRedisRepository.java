@@ -14,6 +14,7 @@ import java.time.Duration;
 - This file is a thin cache abstraction.
 - We'll be caching TaskEntity (DB representation, not domain Task). This is good DDD (Domain-Driven Design): Cache the authoritative persisted shape.
 */
+// NOTE:+DEBUG: During refactoring, I should clean things up and probably add this file to package repository instead of this "redis" package. (Avoided for now to keep integration simple).
 @Component
 public class TaskRedisRepository {
     // Field(s):

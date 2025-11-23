@@ -5,6 +5,7 @@ import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.events.TaskCreatedEvent;
 import com.springqprobackend.springqpro.models.Task;
+import com.springqprobackend.springqpro.redis.TaskRedisRepository;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,19 +27,21 @@ EDIT: Forgot to wire this whole part in my bad.
 - ApplicationEventPublisher is an interface in the Spring Framework that encapsulates event publication functionality,
 allowing for decoupling of application components through event-driven architecture. [Google AI Description].
 */
-
+// 2025-11-23-DEBUG: CACHE SYNCS SHOULD ALWAYS OCCUR AFTER DATA SAVES/WRITES (DB IS THE SOURCE OF TRUTH, COMES FIRST).
 @Service
 public class TaskService {
     private static final Logger logger = LoggerFactory.getLogger(TaskService.class);
     private final TaskRepository repository;
     private final QueueService queueService;
+    private final TaskRedisRepository cache;    // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java
 
     @Autowired
     private ApplicationEventPublisher publisher;
 
-    public TaskService(TaskRepository repository, QueueService queueService) {
+    public TaskService(TaskRepository repository, QueueService queueService, TaskRedisRepository cache) {
         this.repository = repository;
         this.queueService = queueService;
+        this.cache = cache; // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java
     }
 
     @Transactional
@@ -53,6 +56,7 @@ public class TaskService {
                 Instant.now()
         );
         repository.save(entity);
+        cache.put(entity);  // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java (SAVE ENTITY IN CACHE AFTER DATABASE SAVE).
         logger.info("[TaskService] saved task {}, publishing event", entity.getId());
         publisher.publishEvent(new TaskCreatedEvent(this, entity.getId()));
         logger.info("[TaskService] published TaskCreatedEvent for {}", entity.getId());
@@ -60,33 +64,44 @@ public class TaskService {
     }
 
     public List<TaskEntity> getAllTasks(TaskStatus status) {
+        // 2025-11-23-DEBUG: List queries should return DB-focused.
         if (status == null) return repository.findAll();
         return repository.findByStatus(status);
     }
     /* 2025-11-19-NOTE: I don't know why I didn't add this before, but I should definitely have the option
     to getAllTasks via TaskType type as well, so I'm going to overload the method above. */
     public List<TaskEntity> getAllTasks(TaskType type) {
+        // 2025-11-23-DEBUG: List queries should return DB-focused.
         if(type == null) return repository.findAll();
         return repository.findByType(type);
     }
 
     public Optional<TaskEntity> getTask(String id) {
-        return repository.findById(id); // Optional basically means this value may or may not exist.
+        // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java (and Redis in general). Better to retrieve Task via ID from Cache!
+        TaskEntity cached = cache.get(id);
+        if(cached != null) return Optional.of(cached);
+        Optional<TaskEntity> fromDB = repository.findById(id);
+        fromDB.ifPresent(cache::put);   // 2025-11-23-DEBUG: IMPORTANT! If Task is not in the cache but in DB, after retrieving it, save it to the cache...
+        return fromDB;
     }
 
     @Transactional
     public void updateStatus(String id, TaskStatus newStatus, int updAttempts) {
+        // 2025-11-23-DEBUG: Edit method updateStatus(...) to sync the cache:
         repository.findById(id).ifPresent(task -> {
             task.setStatus(newStatus);
             task.setAttempts(updAttempts);
             repository.save(task);
+            cache.put(task);    // 2025-11-23-DEBUG: SYNC THE CACHE!
         });
     }
 
     @Transactional
     public boolean deleteTask(String id) {
+        // 2025-11-23-DEBUG: Edit method deleteTask(...) to sync the cache:
         if (repository.existsById(id)) {
             repository.deleteById(id);
+            cache.delete(id);   // 2025-11-23-DEBUG: SYNC THE CACHE!
             return true;
         }
         return false;
