@@ -9,7 +9,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 - Testcontainers lifecycle.
 - PostgreSQL datasource auto-wiring from BasePostgresContainer.
 */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.main.allow-bean-definition-overriding=true")
 @Testcontainers
 public abstract class IntegrationTestBase extends BasePostgresContainer {
 }
