@@ -3,6 +3,7 @@ package com.springqprobackend.springqpro.integration;
 import com.redis.testcontainers.RedisContainer;
 import com.springqprobackend.springqpro.config.RedisTestConfig;
 import com.springqprobackend.springqpro.redis.RedisDistributedLock;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
@@ -34,6 +35,14 @@ public class RedisDistributedLockIntegrationTest {
     private StringRedisTemplate stringRedis;
 
     private static final String LOCK_KEY = "lock:test-item";
+
+    @BeforeEach
+    void cleanUp() {
+        stringRedis.getRequiredConnectionFactory()
+                .getConnection()
+                .serverCommands()
+                .flushAll();
+    }
 
     @Test
     void testAcquireLock_whenFree_shouldSucceed() {
