@@ -2,20 +2,38 @@ name: Backend CI
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main", "develop" ]
+    branches: ["main"]
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
 
     services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Wait for DB readiness
+        options: >-
+          --health-cmd="pg_isready -U postgres -d testdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
       redis:
         image: redis:7.2
         ports:
           - 6379:6379
-
+        options: >-
+          --health-ccmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,21 +45,33 @@ jobs:
           java-version: 21
           cache: maven
 
-      - name: Increase vm.max_map_count for Testcontainers
+      - name: Wait for Postgres
         run: |
-          sudo sysctl -w vm.max_map_count=262144
+          for i in {1..20}; do
+            nc -z localhost 5432 && echo "Postgres ready" && break
+            echo "Waiting for Postgres..."
+            sleep 2
+          done
 
-      - name: Run Maven tests (unit + integration)
+      - name: Wait for Redis
+        run: |
+          for i in {1..20}; do
+            nc -z localhost 6379 && echo "Redis ready" && break
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+
+      - name: Enable Testcontainers container reuse
+        run: |
+          mkdir -p ~/.testcontainers
+          echo 'testcontainers.reuse.enable=true' > ~/.testcontainers.properties
+
+      - name: Build & test
         run: mvn -B clean verify
         working-directory: ./springqpro-backend
         env:
-          SPRING_PROFILES_ACTIVE: test
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-
-      - name: Upload Surefire reports (if tests fail)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: surefire-reports
-          path: springqpro-backend/target/surefire-reports/
+          TESTCONTAINERS_RYUK_DISABLED: false
+          TESTCONTAINERS_CHECKS_DISABLE: true
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
