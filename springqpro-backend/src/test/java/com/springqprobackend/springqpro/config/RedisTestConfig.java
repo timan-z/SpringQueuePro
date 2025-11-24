@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -21,6 +22,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 // 2025-11-23-NOTE: OVERRIDES REDISTEMPLATE AND STRINGREDISTEMPLATE SO TESTS CAN USE THE TESTCONTAINERS.
 // REDIS INSTANCE INJECTED WITH @SERVICECONNECTION
+@Profile("test")
 @Configuration
 public class RedisTestConfig {
     @Bean
