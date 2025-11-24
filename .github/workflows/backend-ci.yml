@@ -33,6 +33,7 @@ jobs:
 
       - name: Run Maven tests (unit + integration)
         run: mvn -B clean verify
+        working-directory: ./springqpro-backend
         env:
           SPRING_PROFILES_ACTIVE: test
           REDIS_HOST: localhost
