@@ -34,3 +34,7 @@ graphql:
     enabled: true  # enable in-browser GraphiQL UI
   schema:
     locations: classpath:graphql/
+
+jwt:
+  secret: "CHANGEME_SUPER_SECRET_256_BIT_VALUE"
+  expirationMs: 86400000   # 24 hours

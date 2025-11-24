@@ -17,6 +17,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import static org.assertj.core.api.Assertions.*;
 
+// NOTE: REDIS TEST
+
 @DataRedisTest
 @Testcontainers
 @SpringJUnitConfig

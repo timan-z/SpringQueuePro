@@ -22,6 +22,8 @@ import org.testcontainers.utility.DockerImageName;
 import java.time.Instant;
 import static org.assertj.core.api.Assertions.*;
 
+// NOTE: REDIS TEST
+
 /* 2025-11-23-NOTE(S):
 - This Integration test verifies that writes to and reads from the Redis layer work.
 - Tests JSON serialization via Jackson.
