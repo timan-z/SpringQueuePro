@@ -8,6 +8,7 @@ import org.apache.catalina.connector.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -39,33 +41,43 @@ public class AuthenticationController {
     }
 
     // Method(s):
+    // 2025-11-25-NOTE: Now will throw ResponseStatusException(HttpStatus.CONFLICT, ...); for already-existing email. GlobalExceptionHandler now formats the JSON response.
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
+    public ResponseEntity<Map<String, String>> register(@RequestBody RegisterRequest req) {
         if (userRepo.existsById(req.email())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Email already registered."));
+            // 409 CONFLICT is what is usually used for "resource already exists."
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
         }
         String hash = encoder.encode(req.password());
         userRepo.save(new UserEntity(req.email(), hash));
-        return ResponseEntity.ok(Map.of("status", "registered"));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("status", "registered"));
     }
+    // 2025-11-25-NOTE: Now will throw BadCredentialsException for invalid Login credentials. GlobalExceptionHandler now formats the JSON response.
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest req) {
-        UserEntity user = userRepo.findById(req.email()).orElse(null);
-        if (user == null || !encoder.matches(req.password(), user.getPasswordHash())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid login credentials."));
+    public AuthResponse login(@RequestBody LoginRequest req) {
+        UserEntity user = userRepo.findById(req.email()).orElseThrow(() -> new BadCredentialsException("Invalid login credentials"));
+        if(!encoder.matches(req.password(), user.getPasswordHash())) {
+            throw new BadCredentialsException("Invalid credentials");
         }
-        String access = jwt.generateAccessToken(req.email());
-        String refresh = jwt.generateRefreshToken(req.email());
-        redis.storeRefreshToken(refresh, req.email(), refreshTtlMs);
-        return ResponseEntity.ok(new AuthResponse(access, refresh));
+        String access = jwt.generateAccessToken(user.getEmail());
+        String refresh = jwt.generateRefreshToken(user.getEmail());
+        redis.storeRefreshToken(refresh, user.getEmail(), refreshTtlMs);
+        // Return pure DTO - GlobalExceptionHandler will shape errors:
+        return new AuthResponse(access, refresh);
     }
+    /* 2025-11-25-NOTE(S): refresh() now throws
+    - BAD_REQUEST if token is missing
+    - UNAUTHORIZED if redis can't find it and/or if JWT is expired.
+    GlobalExceptionHandler now formats the JSON response.
+    */
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestBody RefreshRequest req) {
+    public AuthResponse refresh(@RequestBody RefreshRequest req) {
         String oldRefresh = req.refreshToken();
         // This first condition check here checks to see if a Token was even provided:
-        if(oldRefresh == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "No refresh token provided"));
+        if (oldRefresh == null || oldRefresh.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No refresh token provided");
         }
+        // Look up in Redis (source of truth for issued/rotated tokens):
         String email = redis.getEmailForToken(oldRefresh);
         /* This second condition check here is a bit tricky. So here's what's going on:
         With the statement above this comment block, I'm checking to see if this token is currently stored in the Redis layer.
@@ -73,8 +85,9 @@ public class AuthenticationController {
         removed it automatically) or it didn't exist/was deleted/tampered with (and so Redis doesn't recognize it).
         The message that's sent relates to this ambiguity.
         */
-        if(email == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired refresh token"));
+        if (email == null) {
+            // Could be expired from Redis TTL, never issued, or manually deleted
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
         }
         /* This third condition check here is still needed though because Redis isn't the "source of truth" (Redis only lets us
         know if the Token existed at some point or that the Token hasn't yet expired in Redis). Redis, however, will NOT guarantee
@@ -83,8 +96,7 @@ public class AuthenticationController {
         // SO ^ the condition below ACTUALLY checks to see if it's expired (because we know it's in Redis and *should* be a valid issued token:
         if (jwt.isExpired(oldRefresh)) {
             redis.delete(oldRefresh);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Refresh token expired"));
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token expired");
         }
         /*
         Redis is the "source of truth" for refresh token persistence, but JWT is the source of truth for token validity.
@@ -103,6 +115,19 @@ public class AuthenticationController {
         String newAccess = jwt.generateAccessToken(email);
         String newRefresh = jwt.generateRefreshToken(email);
         redis.storeRefreshToken(newRefresh, email, refreshTtlMs);
-        return ResponseEntity.ok(new AuthResponse(newAccess, newRefresh));
+        return new AuthResponse(newAccess, newRefresh);
+    }
+
+    // 2025-11-25-NOTE: ADDING THIS ENDPOINT. HAVING THIS SHOULD BE COMMONSENSE BUT IT'S ALSO GOOD FOR REFRESH TOKEN REMOVAL.
+    // No JWT validation here — logout is a server-side cleanup operation only. This is *apparently* exactly how Auth0, AWS Cognito, GitHub OAuth implement logout.
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(@RequestBody RefreshRequest req) {
+        String refresh = req.refreshToken();
+        if (refresh == null || refresh.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No refresh token provided");
+        }
+        // Just delete – even if nonexistent. Logout must be idempotent.
+        redis.delete(refresh);
+        return ResponseEntity.ok(Map.of("status", "logged out"));
     }
 }
