@@ -62,4 +62,31 @@ public class JwtUtil {
             return true;    // Invalid tokens are expired.
         }
     }
+    /* NOTE: This method below can definitely just combine isExpired and extractEmail but better to make it be a "single parse"
+    so I completely eliminate the possibility of signature tampering, corrupt tokens, and so on. */
+    /* Stuff that could go wrong apparently according to ChatGPT (if I just did isExpired -> extractEmail):
+    Invalid signature, Tampered or truncated token, Wrong key, Wrong algorithm, Null token, Missing subject
+    Expired token, and Other malformed JWT errors */
+    public String validateAndGetSubject(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            // Check expiration manually (JJWT 0.12 no longer auto-fails expired tokens)
+            if (claims.getExpiration() == null || claims.getExpiration().before(new Date())) {
+                throw new ExpiredJwtException(null, claims, "Token is expired");
+            }
+            return claims.getSubject();
+        } catch (ExpiredJwtException ex) {
+            throw ex; // bubble up "expired" explicitly
+        } catch (JwtException ex) {
+            // SignatureException, MalformedJwtException, UnsupportedJwtException, etc.
+            throw new JwtException("Invalid JWT token", ex);
+        } catch (IllegalArgumentException ex) {
+            throw new JwtException("JWT token is empty or null", ex);
+        }
+    }
+
 }
