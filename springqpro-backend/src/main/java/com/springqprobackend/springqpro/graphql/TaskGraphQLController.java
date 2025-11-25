@@ -19,6 +19,7 @@ import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /* NOTE(S)-TO-SELF:
 - @QueryMapping is the GraphQL query resolver (to read operations / basically retrieve stuff, from what I understand).
@@ -37,48 +38,57 @@ public class TaskGraphQLController {
         this.taskService = taskService;
     }
 
+    // QUERIES:
     @QueryMapping   // This is GraphQL query resolver.
     @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public List<TaskEntity> tasks(@Argument TaskStatus status, Authentication auth) {
-        logger.info("INFO: GraphQL tasks (by status) Query sent by user:{}", auth.getName());
-        return taskService.getAllTasks(status);
+        String owner = auth.getName();
+        logger.info("INFO: GraphQL 'tasks' (by status) Query sent by user:{}", owner);
+        return taskService.getAllTasksForUser(status, owner);
     }
     @QueryMapping
     @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public List<TaskEntity> tasksType(@Argument TaskType type, Authentication auth) {
-        logger.info("INFO: GraphQL tasks (by type) Query sent by user:{}", auth.getName());
-        return taskService.getAllTasks(type);
+        String owner = auth.getName();
+        logger.info("INFO: GraphQL 'tasks' (by type) Query sent by user:{}", owner);
+        return taskService.getAllTasksForUserByType(type, owner);
     }
-
     @QueryMapping
     @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public TaskEntity task(@Argument String id, Authentication auth) {
-        logger.info("INFO: GraphQL task (by id) Query sent by user:{}", auth.getName());
-        return taskService.getTask(id).orElse(null);
+        String owner = auth.getName();
+        logger.info("INFO: GraphQL 'task' (by id:{}) Query sent by user:{}", id, owner);
+        return taskService.getTaskForUser(id, owner).orElse(null);
     }
 
+    // MUTATIONS:
     @MutationMapping
     @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public TaskEntity createTask(@Argument("input") CreateTaskInput input, Authentication auth) {
-        logger.info("INFO: GraphQL createTask Query sent by user:{}", auth.getName());
-        return taskService.createTask(input.payload(), input.type());
+        String owner = auth.getName();
+        logger.info("INFO: GraphQL 'createTask' Query sent by user:{}", owner);
+        return taskService.createTaskForUser(input.payload(), input.type(), owner);
     }
-
     @MutationMapping
     @Transactional
     @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public TaskEntity updateTask(@Argument("input") UpdateTaskInput input, Authentication auth) {
-        logger.info("INFO: GraphQL updateTask Query sent by user:{}", auth.getName());
+        String owner = auth.getName();
+        logger.info("INFO: GraphQL 'updateTask' (id={}) Query sent by user:{}", input.id(), owner);
+        // Ownership check (User shouldn't be allowed to update other User's tasks; no cross-user updates):
+        taskService.getTaskForUser(input.id(), owner).orElseThrow(() -> new RuntimeException("Task not found or not owned by current user."));
         taskService.updateStatus(input.id(), input.status(), input.attempts());
-        return taskService.getTask(input.id()).orElse(null);
-        //return task(input.id())  ;    // or "return taskService.getTask(id).orElse(null);"
+        return taskService.getTaskForUser(input.id(), owner).orElse(null);
     }
-
     @MutationMapping
     @Transactional
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public boolean deleteTask(@Argument String id, Authentication auth) {
-        logger.info("INFO: GraphQL deleteTask Query sent by user:{}", auth.getName());
+        String owner = auth.getName();
+        logger.info("INFO: GraphQL 'deleteTask' (id={}) Query sent by user:{}", id, auth.getName());
+        if(taskService.getTaskForUser(id, owner).isEmpty()) {
+            return false;
+        }
         return taskService.deleteTask(id);
     }
 

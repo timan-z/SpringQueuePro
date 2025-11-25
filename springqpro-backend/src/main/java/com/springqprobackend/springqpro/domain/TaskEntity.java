@@ -53,24 +53,34 @@ Handling this with @Version etc is the way that real Job Queue systems like Side
 @Table(name="tasks")
 public class TaskEntity {
     @Id
+    @Column(nullable = false, updatable = false)
     private String id;
 
     @Column(columnDefinition="text")    // Allows long payloads
     private String payload;
 
     @Enumerated(EnumType.STRING)    // Store enum as readable string (as opposed to numeric).
+    @Column(nullable = false)
     private TaskType type;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private TaskStatus status;
 
+    @Column(nullable = false)
     private int attempts;
+    @Column(nullable = false)
     private int maxRetries;
 
     @Column(name="created_at")  // custom DataBase column name.
     private Instant createdAt;
 
+    // 2025-11-25-NOTE: Enforcing JWT User Ownership - this implementation is key!
+    @Column(name = "created_by", nullable=false, length = 255)
+    private String createdBy;
+
     // Optimistic locking field (protects against lost updates):
+    // 2025-11-25-NOTE: This is probably outdated at this point but I'll leave it for the future cleanup down the line.
     @Version
     private Long version;
 
@@ -86,6 +96,11 @@ public class TaskEntity {
         this.maxRetries = maxRetries;
         this.createdAt = createdAt;
     }
+    // EDIT:+DEBUG: Maybe this will be helpful - Constructor that'll also set createdBy:
+    public TaskEntity(String id, String payload, TaskType type, TaskStatus status, int attempts, int maxRetries, Instant createdAt, String createdBy) {
+        this(id, payload, type, status, attempts, maxRetries, createdAt);
+        this.createdBy = createdBy;
+    }
 
     // JPA will use the getter and setter methods to map to the table columns:
     // getters:
@@ -97,6 +112,7 @@ public class TaskEntity {
     public int getMaxRetries() { return maxRetries; }
     public Instant getCreatedAt() { return createdAt; }
     public Long getVersion() { return version; }
+    public String getCreatedBy() { return createdBy; }
     // setters:
     public void setId(String id) { this.id = id; }
     public void setPayload(String payload) { this.payload = payload; }
@@ -105,4 +121,5 @@ public class TaskEntity {
     public void setAttempts(int attempts) { this.attempts = attempts; }
     public void setMaxRetries(int maxRetries) { this.maxRetries = maxRetries; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
 }

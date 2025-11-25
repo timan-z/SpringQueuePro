@@ -8,6 +8,7 @@ type Task {
     attempts: Int!
     maxRetries: Int!
     createdAt: String!
+    createdBy: String!
 }
 """
 Enumeration for Task Status:
@@ -49,6 +50,10 @@ input StdUpdateTaskInput {
     status: TaskStatus,
     attempts: Int
 }
+"""
+Queries for fetching tasks.
+All queries automatically apply per-user filtering (by createdBy) at the controller/service layer.
+"""
 # Query = to retrieve/read data.
 type Query {
     """

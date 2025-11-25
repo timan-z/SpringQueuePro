@@ -44,6 +44,48 @@ public class TaskService {
         this.cache = cache; // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java
     }
 
+    // 2025-11-25-NOTE: JWT USER OWNERSHIP REFACTORING METHOD BELOW (PROBABLY MAKES THE OTHER ONE OBSOLETE -- will be what GraphQL calls now):
+    // NOTE: This is the new "entry point" used by GraphQL and I guess the JWT-protected REST stuff (but mainly GraphQL of course).
+    @Transactional
+    public TaskEntity createTaskForUser(String payload, TaskType type, String ownerEmail) {
+        TaskEntity entity = new TaskEntity(
+                "Task-" + System.nanoTime(),
+                payload,
+                type,
+                TaskStatus.QUEUED,
+                0,
+                3,
+                Instant.now(),
+                ownerEmail
+        );
+        repository.save(entity);
+        // Map to in-memory Task model for existing queue/handlers
+        Task task = new Task(
+                entity.getId(),
+                entity.getPayload(),
+                entity.getType(),
+                entity.getStatus(),
+                entity.getAttempts(),
+                entity.getMaxRetries(),
+                entity.getCreatedAt()
+        );
+        queueService.enqueue(task);
+        return entity;
+    }
+    // 2025-11-25-DEBUG: JWT USER OWNERSHIP-RELATED REFACTORING METHODS:
+    // NOTE: Old global ones will remain -- I should probably add ADMIN status to them or something.
+    public List<TaskEntity> getAllTasksForUser(TaskStatus status, String ownerEmail) {
+        if (status == null) return repository.findAllByCreatedBy(ownerEmail);
+        return repository.findByStatusAndCreatedBy(status, ownerEmail);
+    }
+    public List<TaskEntity> getAllTasksForUserByType(TaskType type, String ownerEmail) {
+        if (type == null) return repository.findAllByCreatedBy(ownerEmail);
+        return repository.findByTypeAndCreatedBy(type, ownerEmail);
+    }
+    public Optional<TaskEntity> getTaskForUser(String id, String ownerEmail) {
+        return repository.findByIdAndCreatedBy(id, ownerEmail);
+    }
+    // 2025-11-25-DEBUG: Method below is probably legacy code now.
     @Transactional
     public TaskEntity createTask(String payload, TaskType type) {
         TaskEntity entity = new TaskEntity(

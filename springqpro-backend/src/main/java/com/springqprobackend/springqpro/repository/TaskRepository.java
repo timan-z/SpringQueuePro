@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /* NOTES-TO-SELF:
 - Spring Data JPA can automatically create repositories (DAOs - Data Access Objects) from interfaces.
@@ -43,6 +44,15 @@ public interface TaskRepository extends JpaRepository<TaskEntity, String> {
     List<TaskEntity> findByStatus(TaskStatus status);
     List<TaskEntity> findByType(TaskType type); // <-- 2025-11-19-DEBUG: I don't know why I'm only adding this now.
 
+    // 2025-11-25-NOTE: IMPLEMENTING JWT OWNERSHIP ADDITION:
+    @Query("""
+            SELECT t
+            FROM TaskEntity t
+            WHERE (:status IS NULL OR t.status = :status)
+              AND (:type IS NULL OR t.type = :type)
+            """)
+    List<TaskEntity> findByStatusAndType(@Param("status") TaskStatus status, @Param("type") TaskType type);
+
     /*
     worker tries to claim e.g., via transitionStatus(id, QUEUED, INPROGRESS, currentAttempts+1).
     If it returns 1, the claim succeeded; otherwise another worker claimed it or the status changed.
@@ -60,4 +70,10 @@ public interface TaskRepository extends JpaRepository<TaskEntity, String> {
     @Transactional
     @Query("UPDATE TaskEntity t SET t.status = :to WHERE t.id = :id AND t.status = :from")
     int transitionStatusSimple(@Param("id") String id, @Param("from") TaskStatus from, @Param("to") TaskStatus to);
+
+    // 2025-11-25-DEBUG: NEW METHODS BELOW HELP ENFORCE JWT USER OWNERSHIP OF TASKS!!! (IN THE SERVICE/CONTROLLER LAYER).
+    List<TaskEntity> findAllByCreatedBy(String createdBy);
+    List<TaskEntity> findByStatusAndCreatedBy(TaskStatus status, String createdBy);
+    List<TaskEntity> findByTypeAndCreatedBy(TaskType type, String createdBy);
+    Optional<TaskEntity> findByIdAndCreatedBy(String id, String createdBy);
 }
