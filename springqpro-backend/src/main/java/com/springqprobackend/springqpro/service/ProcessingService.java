@@ -109,6 +109,12 @@ public class ProcessingService {
     // The retry doesn’t live inside the handler anymore — it’s a post-processing policy in ProcessingService. If it throws, the failure is caught in the ProcessingService try/catch block.
     @Transactional  // <-- forgot this, it should 100% be here.
     public void claimAndProcess(String taskId) {
+        /* 2025-11-24-DEBUG: ADDING STRONG VALIDATION TO THIS METHOD AS PART OF JWT INTEGRATION!!!
+        ProcessingService MUST NOT trust or execute invalid Ids!!! */
+        if (!taskRepository.existsById(taskId)) {
+            logger.warn("WARNING: Processing request ignored — task does not exist.");
+            return;
+        }
         logger.info("[ProcessingService] starting claimAndProcess for {}", taskId);
         // Load current in-DB Task snapshot (it'll be "frozen" as QUEUED until this method "claims" it):
         // NOTE: As alluded to, this is basically replacing the "Thread dequeues as processes a Task" functionality of QueueService.

@@ -1,46 +1,65 @@
 package com.springqprobackend.springqpro.security;
 
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
-    private final Key key;
-    private final long expirationMs;
-    public JwtUtil(@Value("${jwt.secret}") String secret, @Value("${jwt.expirationMs}") long expirationMs) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes());
-        this.expirationMs = expirationMs;
+    // Field(s):
+    private SecretKey key;
+    private final long accessTokenExpirationMs = 15 * 60 * 1000; // 15 min
+    private final long refreshTokenExpirationMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+    // Constructor(s):
+    public JwtUtil(@Value("${jwt.secret}") String secret) {
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
-    public String generateToken(String email) {
+
+    // Method(s):
+    // SHORT-LIVED TOKEN:
+    public String generateAccessToken(String email) {
         return Jwts.builder()
-                .setSubject(email)
-                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
-                .signWith(key, SignatureAlgorithm.HS256)
+                .subject(email)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + accessTokenExpirationMs))
+                .signWith(key)
+                .compact();
+    }
+    // REFRESH TOKEN = LONG-LIVED TOKEN:
+    public String generateRefreshToken(String email) {
+        return Jwts.builder()
+                .subject(email)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + refreshTokenExpirationMs))
+                .signWith(key)
                 .compact();
     }
     public String extractEmail(String token) {
         return Jwts.parser()
-                .setSigningKey(key)
+                .verifyWith(key)
                 .build()
-                .parseClaimsJws(token)
-                .getBody()
+                .parseSignedClaims(token)
+                .getPayload()
                 .getSubject();
     }
-    public boolean validateToken(String token) {
+    public boolean isExpired(String token) {
         try {
-            Jwts.parser()
-                    .setSigningKey(key)
+            Date expDate = Jwts.parser()
+                    .verifyWith(key)
                     .build()
-                    .parseClaimsJws(token);
-        } catch(JwtException | IllegalArgumentException e) {
-            return false;
+                    .parseSignedClaims(token)
+                    .getPayload()
+                    .getExpiration();
+            return expDate.before(new Date());
+        } catch (Exception e) {
+            return true;    // Invalid tokens are expired.
         }
-        return true;
     }
 }

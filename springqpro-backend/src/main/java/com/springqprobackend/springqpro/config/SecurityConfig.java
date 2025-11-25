@@ -3,6 +3,7 @@ package com.springqprobackend.springqpro.config;
 import com.springqprobackend.springqpro.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -10,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+@EnableMethodSecurity
 @Configuration
 public class SecurityConfig {
     private final JwtAuthenticationFilter jwtFilter;
@@ -27,6 +29,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/auth/register").permitAll()
+                        .requestMatchers("/auth/login").permitAll()
+                        .requestMatchers("/auth/refresh").permitAll()
                         // GraphQL endpoint
                         .requestMatchers("/graphql").authenticated()
                         // REST endpoints (I know that GraphQL is my main thing now -- but I might as well have these, also it's TaskRestController that will replace these).

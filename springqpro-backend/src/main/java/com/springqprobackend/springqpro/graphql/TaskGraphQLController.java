@@ -6,6 +6,8 @@ import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.service.TaskService;
 import com.springqprobackend.springqpro.graphql.controllerRecords.CreateTaskInput;
 import com.springqprobackend.springqpro.graphql.controllerRecords.UpdateTaskInput;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -42,24 +44,29 @@ public class TaskGraphQLController {
     }
 
     @QueryMapping   // This is GraphQL query resolver.
+    @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public List<TaskEntity> tasks(@Argument TaskStatus status) {
         return taskService.getAllTasks(status);
     }
     @QueryMapping
+    @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public List<TaskEntity> tasksType(@Argument TaskType type) { return taskService.getAllTasks(type); }    // <-- 2025-11-19-DEBUG: ADDITION.
 
     @QueryMapping
+    @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public TaskEntity task(@Argument String id) {
         return taskService.getTask(id).orElse(null);
     }
 
     @MutationMapping
+    @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public TaskEntity createTask(@Argument("input") CreateTaskInput input) {
         return taskService.createTask(input.payload(), input.type());
     }
 
     @MutationMapping
     @Transactional
+    @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public TaskEntity updateTask(@Argument("input") UpdateTaskInput input) {
         taskService.updateStatus(input.id(), input.status(), input.attempts());
         return task(input.id());    // or "return taskService.getTask(id).orElse(null);"
@@ -67,7 +74,14 @@ public class TaskGraphQLController {
 
     @MutationMapping
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public boolean deleteTask(@Argument String id) {
         return taskService.deleteTask(id);
+    }
+
+    @SchemaMapping(typeName = "Task", field = "payload")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public String securePayload(TaskEntity entity) {
+        return entity.getPayload();
     }
 }
