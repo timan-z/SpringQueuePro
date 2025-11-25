@@ -3,6 +3,8 @@ package com.springqprobackend.springqpro.config;
 import com.springqprobackend.springqpro.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -26,6 +28,15 @@ public class SecurityConfig {
     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        /* IMPORTANT-NOTE (line of code below this comment block) - Enabling CORS so that:
+        - GraphiQL (my Browser client) can call POST /graphql
+        - Future REACT frontend / Cloud deployment / API Gateway can access the API (obv important for deployment).
+        - Modern Spring Security requires explicit CORS in stateless JWT apps.
+        withDefaults() basically means:
+        - Use Spring Boot's auto CORS config (from application.yml)
+        - Do not block browser to backend API calls.
+        */
+        http.cors(Customizer.withDefaults());
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
@@ -34,13 +45,13 @@ public class SecurityConfig {
                         .requestMatchers("/auth/register").permitAll()
                         .requestMatchers("/auth/login").permitAll()
                         .requestMatchers("/auth/refresh").permitAll()
-                        // GraphQL endpoint
-                        .requestMatchers("/graphql").authenticated()
+                        // GraphQL endpoint - EDIT: Adjusted so secured only for POST since GraphQL ops only use POST. (GET shouldn't req authentication).
+                        .requestMatchers(HttpMethod.POST,"/graphql").authenticated()
                         // REST endpoints (I know that GraphQL is my main thing now -- but I might as well have these, also it's TaskRestController that will replace these).
                         .requestMatchers("/api/tasks/**").authenticated()
                         .anyRequest().permitAll()
                 )
-                // Attach JWT Filter:
+                // Attach JWT Filter (run BEFORE UsernamePasswordAuthenticationFilter):
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
