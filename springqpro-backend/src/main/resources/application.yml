@@ -36,5 +36,5 @@ graphql:
     locations: classpath:graphql/
 
 jwt:
-  secret: "CHANGEME_SUPER_SECRET_256_BIT_VALUE"
+  secret: "84a10c506cede01a0fcf7cd8bf69f47d6180042e94abb035961cb642f6dc8b59690cfa49"
   expirationMs: 86400000   # 24 hours

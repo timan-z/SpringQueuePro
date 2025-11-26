@@ -67,7 +67,8 @@ public class TaskService {
                 entity.getStatus(),
                 entity.getAttempts(),
                 entity.getMaxRetries(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getCreatedBy()
         );
         queueService.enqueue(task);
         return entity;
