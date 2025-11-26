@@ -35,7 +35,7 @@ import java.util.Date;
 import java.util.Map;
 import static org.assertj.core.api.Assertions.*;
 
-// THIS IS INTEGRATION TEST FOR THE JWT ASPECT [1]
+// THIS IS INTEGRATION TEST FOR THE JWT ASPECT [1] -- for main stuff.
 
 // 2025-11-26-NOTE: Remember, efficient setup of my Integration Tests are not high priority while I rush to project MVP completion. I can return to this later!
 /* 2025-11-26-NOTE(S):
@@ -59,8 +59,6 @@ public class AuthJwtIntegrationTest {
     @Autowired
     private StringRedisTemplate redis;
 
-    @LocalServerPort
-    int port;
     @Value("${jwt.secret}")
     private String jwtSecret;   // will be used for test that forges an expired JWT.
 
