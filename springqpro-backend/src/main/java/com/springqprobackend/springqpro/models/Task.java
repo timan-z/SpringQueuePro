@@ -43,11 +43,14 @@ public class Task {
     @PastOrPresent(message="Creation Time Stamp cannot be in the future.")
     private Instant createdAt;   // TO-DO:(?) I format this with LocalDateTime. (I could change this to that type for better filtering and so on).
 
+    @NotBlank(message="Task owner cannot be blank.")
+    private String createdBy;
+
     // Constructor(s):
     // no-args Constructor - for potential frameworks like Jackson/JPA (that may serialize/deserialize the object):
     public Task() {}
     // Main Constructor:
-    public Task(String id, String payload, TaskType type, TaskStatus status, int attempts, int maxRetries, Instant createdAt) {
+    public Task(String id, String payload, TaskType type, TaskStatus status, int attempts, int maxRetries, Instant createdAt, String createdBy) {
         this.id = id;
         this.payload = payload;
         this.type = type;
@@ -55,6 +58,7 @@ public class Task {
         this.attempts = attempts;
         this.maxRetries = maxRetries;
         this.createdAt = createdAt;
+        this.createdBy = createdBy;
     }
 
     // Getter methods:
@@ -79,6 +83,7 @@ public class Task {
     public String getCreatedAt() {
         return createdAt.toString();
     }
+    public String getCreatedBy() { return createdBy; }
 
     // Setter methods:
     public void setId(String id) {
@@ -102,7 +107,9 @@ public class Task {
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
 
+    // REFACTORING-TO-DO: I have not factored "createdBy" field into the stuff below (should I? Figure out later).
     // toString():
     @Override
     public String toString() {

@@ -4,6 +4,8 @@ import com.springqprobackend.springqpro.domain.TaskEntity;
 import com.springqprobackend.springqpro.models.Task;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+
 /* 2025-11-15-DEBUG:+NOTE(S)-TO-SELF:
 This file is primarily to avoid doing TaskEntity -> Task conversion and so on within ProcessingService.java (decoupling purposes).
 Remember, Handlers should be operating on Domain objects (Task) and not Persistence objects (TaskEntity).
@@ -22,14 +24,19 @@ public class TaskMapper {
                 e.getStatus(),
                 e.getAttempts(),
                 e.getMaxRetries(),
-                e.getCreatedAt()
+                e.getCreatedAt(),
+                e.getCreatedBy()
         );
     }
     // Reconciles Domain (Task) -> TaskEntity after handler completes.
     public void updateEntity(Task domain, TaskEntity entity) {
         if(domain == null | entity == null) return;
+        entity.setPayload(domain.getPayload());
+        entity.setType(domain.getType());
         entity.setStatus(domain.getStatus());
         entity.setAttempts(domain.getAttempts());
-        entity.setPayload(domain.getPayload());
+        entity.setMaxRetries(domain.getMaxRetries());
+        entity.setCreatedAt(Instant.parse(domain.getCreatedAt()));
+        entity.setCreatedBy(domain.getCreatedBy());
     }
 }
