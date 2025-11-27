@@ -52,13 +52,7 @@ public class TaskService {
     // NOTE: This is the new "entry point" used by GraphQL and I guess the JWT-protected REST stuff (but mainly GraphQL of course).
     @Transactional
     public TaskEntity createTaskForUser(String payload, TaskType type, String ownerEmail) {
-
-        logger.info("DEBUG:[createTaskForUser] where's the problem - 1");
-
         apiTaskCreateCounter.increment();   // 2025-11-26-NOTE: METRICS ADDITION!
-
-        logger.info("DEBUG:[createTaskForUser] where's the problem - 2");
-
         TaskEntity entity = new TaskEntity(
                 "Task-" + System.nanoTime(),
                 payload,
@@ -69,34 +63,20 @@ public class TaskService {
                 Instant.now(),
                 ownerEmail
         );
-
-        logger.info("DEBUG:[createTaskForUser] where's the problem - 3");
-
+        logger.info("[TaskService][createTaskForUser] About to save TaskEntity inside of TaskRepository.");
         repository.save(entity);
+        logger.info("[TaskService][createTaskForUser] TaskEntity has been saved inside of TaskRepository.");
 
-        logger.info("DEBUG:[createTaskForUser] where's the problem - 4");
+        logger.info("[TaskService][createTaskForUser] About to save TaskEntity inside of TaskRedisRepository (Cache).");
+        cache.put(entity);
+        logger.info("[TaskService][createTaskForUser] TaskEntity has been saved inside of TaskRedisRepository (Cache).");
 
-        // Map to in-memory Task model for existing queue/handlers
-        Task task = new Task(
-                entity.getId(),
-                entity.getPayload(),
-                entity.getType(),
-                entity.getStatus(),
-                entity.getAttempts(),
-                entity.getMaxRetries(),
-                entity.getCreatedAt(),
-                entity.getCreatedBy()
-        );
-
-        logger.info("DEBUG:[createTaskForUser] where's the problem - 5");
-
-        queueService.enqueue(task);
-        //queueService.enqueueById(entity.getId());
-
-        logger.info("DEBUG:[createTaskForUser] where's the problem - 6");
-
+        logger.info("[TaskService][createTaskForUser] About to publish TaskCreatedEvent.");
+        publisher.publishEvent(new TaskCreatedEvent(this, entity.getId()));
+        logger.info("[TaskService][createTaskForUser] TaskCreatedEvent has been published.");
         return entity;
     }
+
     // 2025-11-25-DEBUG: JWT USER OWNERSHIP-RELATED REFACTORING METHODS:
     // NOTE: Old global ones will remain -- I should probably add ADMIN status to them or something.
     public List<TaskEntity> getAllTasksForUser(TaskStatus status, String ownerEmail) {
