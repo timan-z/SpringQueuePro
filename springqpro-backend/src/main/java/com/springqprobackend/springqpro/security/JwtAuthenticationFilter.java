@@ -1,11 +1,14 @@
 package com.springqprobackend.springqpro.security;
 
+import com.springqprobackend.springqpro.service.TaskService;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +23,7 @@ import java.io.IOException;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
     public JwtAuthenticationFilter(JwtUtil jwtUtil, UserDetailsService uds) {
@@ -36,6 +40,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         String token = authHeader.substring(7);
         try {
+            // 2025-11-27-NOTE: ADDITION BELOW TO FIX DESIGN FLAW W/ REFRESH TOKEN BEING APPROVED:
+            String type = jwtUtil.getTokenType(token);
+            if (!"access".equals(type)) {
+                // This includes: null, "refresh", malformed, missing type claim.
+                logger.info("[JwtAuthenticationFilter] Refresh Token rejected for API Authentication attempt.");
+                SecurityContextHolder.clearContext();
+                chain.doFilter(request, response);
+                return;
+            }
+            // 2025-11-27-NOTE: ADDITION ABOVE TO FIX DESIGN FLAW W/ REFRESH TOKEN BEING APPROVED.
             String email = jwtUtil.validateAndGetSubject(token);
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);

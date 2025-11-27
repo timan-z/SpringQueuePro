@@ -15,7 +15,8 @@ import java.util.UUID;
 public class JwtUtil {
     // Field(s):
     private SecretKey key;
-    private final long accessTokenExpirationMs = 15 * 60 * 1000; // 15 min
+    //private final long accessTokenExpirationMs = 15 * 60 * 1000; // 15 min
+    private final long accessTokenExpirationMs = 1 * 24 * 60 * 60 * 1000; // 2025-11-27-DEBUG: Changing to 1 day for live testing purposes. (15 minutes is honestly too short, should be ~3 hours or something).
     private final long refreshTokenExpirationMs = 7 * 24 * 60 * 60 * 1000; // 7 days
 
     // Constructor(s):
@@ -28,6 +29,7 @@ public class JwtUtil {
     public String generateAccessToken(String email) {
         return Jwts.builder()
                 .subject(email)
+                .claim("type", "access")
                 .claim("jti", UUID.randomUUID().toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + accessTokenExpirationMs))
@@ -38,6 +40,7 @@ public class JwtUtil {
     public String generateRefreshToken(String email) {
         return Jwts.builder()
                 .subject(email)
+                .claim("type", "refresh")
                 .claim("jti", UUID.randomUUID().toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + refreshTokenExpirationMs))
@@ -65,6 +68,20 @@ public class JwtUtil {
             return true;    // Invalid tokens are expired.
         }
     }
+    // 2025-11-27-NOTE: New method being added to fix a design flaw w/ Refresh Token being approved for API Authentication (that's Access Token's job).
+    public String getTokenType(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.get("type", String.class);
+        } catch (Exception e) {
+            return null; // invalid / malformed token => treat as unusable
+        }
+    }
+
     /* NOTE: This method below can definitely just combine isExpired and extractEmail but better to make it be a "single parse"
     so I completely eliminate the possibility of signature tampering, corrupt tokens, and so on. */
     /* Stuff that could go wrong apparently according to ChatGPT (if I just did isExpired -> extractEmail):
