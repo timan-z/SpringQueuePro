@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import io.micrometer.core.instrument.Counter;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -37,17 +38,21 @@ public class TaskService {
 
     @Autowired
     private ApplicationEventPublisher publisher;
+    // 2025-11-26-NOTE:+DEBUG: METRICS PHASE FIELD ADDITIONS:
+    private final Counter apiTaskCreateCounter;
 
-    public TaskService(TaskRepository repository, QueueService queueService, TaskRedisRepository cache) {
+    public TaskService(TaskRepository repository, QueueService queueService, TaskRedisRepository cache, Counter apiTaskCreateCounter) {
         this.repository = repository;
         this.queueService = queueService;
         this.cache = cache; // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java
+        this.apiTaskCreateCounter = apiTaskCreateCounter;
     }
 
     // 2025-11-25-NOTE: JWT USER OWNERSHIP REFACTORING METHOD BELOW (PROBABLY MAKES THE OTHER ONE OBSOLETE -- will be what GraphQL calls now):
     // NOTE: This is the new "entry point" used by GraphQL and I guess the JWT-protected REST stuff (but mainly GraphQL of course).
     @Transactional
     public TaskEntity createTaskForUser(String payload, TaskType type, String ownerEmail) {
+        apiTaskCreateCounter.increment();   // 2025-11-26-NOTE: METRICS ADDITION!
         TaskEntity entity = new TaskEntity(
                 "Task-" + System.nanoTime(),
                 payload,
@@ -70,7 +75,8 @@ public class TaskService {
                 entity.getCreatedAt(),
                 entity.getCreatedBy()
         );
-        queueService.enqueue(task);
+        //queueService.enqueue(task);
+        queueService.enqueueById(entity.getId());
         return entity;
     }
     // 2025-11-25-DEBUG: JWT USER OWNERSHIP-RELATED REFACTORING METHODS:

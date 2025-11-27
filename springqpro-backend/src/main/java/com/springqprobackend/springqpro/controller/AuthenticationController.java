@@ -4,7 +4,10 @@ import com.springqprobackend.springqpro.domain.UserEntity;
 import com.springqprobackend.springqpro.redis.RedisTokenStore;
 import com.springqprobackend.springqpro.repository.UserRepository;
 import com.springqprobackend.springqpro.security.*;
+import com.springqprobackend.springqpro.service.TaskService;
 import org.apache.catalina.connector.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -26,6 +29,7 @@ import java.util.Map;
 @RequestMapping("/auth")
 public class AuthenticationController {
     // Field(s):
+    private static final Logger logger = LoggerFactory.getLogger(AuthenticationController.class);
     private final UserRepository userRepo;
     private final PasswordEncoder encoder;
     private final JwtUtil jwt;
@@ -46,9 +50,11 @@ public class AuthenticationController {
     public ResponseEntity<Map<String, String>> register(@RequestBody RegisterRequest req) {
         if (userRepo.existsById(req.email())) {
             // 409 CONFLICT is what is usually used for "resource already exists."
+            logger.info("[AuthenticationController] Register attempt failed; provided email is already registered.");
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
         }
         String hash = encoder.encode(req.password());
+        logger.info("[AuthenticationController] Saving new UserEntity (via UserRepository.save(...))");
         userRepo.save(new UserEntity(req.email(), hash));
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("status", "registered"));
     }
@@ -57,10 +63,13 @@ public class AuthenticationController {
     public AuthResponse login(@RequestBody LoginRequest req) {
         UserEntity user = userRepo.findById(req.email()).orElseThrow(() -> new BadCredentialsException("Invalid login credentials"));
         if(!encoder.matches(req.password(), user.getPasswordHash())) {
+            logger.info("[AuthenticationController] Login attempt failed; the password was incorrect.");
             throw new BadCredentialsException("Invalid credentials");
         }
+        logger.info("[AuthenticationController] Login credentials approved. Generating access and refresh tokens.");
         String access = jwt.generateAccessToken(user.getEmail());
         String refresh = jwt.generateRefreshToken(user.getEmail());
+        logger.info("[AuthenticationController] Storing refresh token in RedisTokenStore.");
         redis.storeRefreshToken(refresh, user.getEmail(), refreshTtlMs);
         // Return pure DTO - GlobalExceptionHandler will shape errors:
         return new AuthResponse(access, refresh);

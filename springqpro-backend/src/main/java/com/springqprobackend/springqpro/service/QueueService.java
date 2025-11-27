@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.annotation.PreDestroy;
+import io.micrometer.core.instrument.Counter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -79,10 +80,14 @@ public class QueueService {
     // DEBUG: 2025-11-13 EDIT: Additions below.
     private final TaskRepository taskRepository;        // DEBUG: For optional direct DB READS.
     private final ProcessingService processingService;  // DEBUG: Do processing via transactional service.
+    // DEBUG: 2025-11-26 EDIT: METRICS-RELATED ADDITIONS BELOW!
+    private final Counter queueEnqueueCounter;
+    private final Counter queueEnqueueByIdCounter;
 
     // Constructor:
     @Autowired  // DEBUG: See if this fixes the issue!
-    public QueueService(TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, @Qualifier("execService") ExecutorService executor, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueProperties props) {
+    public QueueService(TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, @Qualifier("execService") ExecutorService executor, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueProperties props,
+                        Counter queueEnqueueCounter, Counter queueEnqueueByIdCounter) {
         this.jobs = new ConcurrentHashMap<>();
         this.taskRepository = taskRepository;
         this.processingService = processingService;
@@ -90,10 +95,14 @@ public class QueueService {
         this.scheduler = scheduler;
         this.handlerRegistry = handlerRegistry;
         this.props = props;
+        // DEBUG: 2025-11-26 EDIT: METRICS-RELATED ADDITIONS BELOW:
+        this.queueEnqueueCounter = queueEnqueueCounter;
+        this.queueEnqueueByIdCounter = queueEnqueueByIdCounter;
     }
 
     // Constructor 2 (specifically for JUnit+Mockito testing purposes, maybe custom setups too I suppose):
-    public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, QueueProperties props){
+    public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, QueueProperties props,
+                        Counter queueEnqueueCounter, Counter queueEnqueueByIdCounter){
         this.jobs = new ConcurrentHashMap<>();
         this.taskRepository = taskRepository;
         this.processingService = processingService;
@@ -101,6 +110,9 @@ public class QueueService {
         this.scheduler = Executors.newScheduledThreadPool(props.getSchedExecWorkerCount());
         this.handlerRegistry = handlerRegistry;
         this.props = props;
+        // DEBUG: 2025-11-26 EDIT: METRICS-RELATED ADDITIONS BELOW:
+        this.queueEnqueueCounter = queueEnqueueCounter;
+        this.queueEnqueueByIdCounter = queueEnqueueByIdCounter;
     }
 
     // DEBUG: 2025-11-13 EDIT: Method additions below. (Kind of replaces some but I'm going to keep my old legacy methods too).
@@ -109,6 +121,7 @@ public class QueueService {
     @PreAuthorize("denyAll()")
     public void enqueueById(String id) {
         logger.info("[QueueService] enqueueById called for {}", id);
+        queueEnqueueByIdCounter.increment();
         executor.submit(() -> {
                 logger.info("[QueueService] submitting runnable for {}", id);
                 processingService.claimAndProcess(id);
@@ -120,6 +133,7 @@ public class QueueService {
     // EDIT: THE VERSION OF enqueue BELOW IS NOW LEGACY CODE FROM THE PROTOTYPE PHASE! enqueueById ABOVE WILL BE USED BY ProcessingService.java.
     public void enqueue(Task t) {
         t.setStatus(TaskStatus.QUEUED);
+        queueEnqueueCounter.increment();
         writeLock.lock();
         try {
             jobs.put(t.getId(), t); // GoQueue: q.jobs[t.ID] = &t;

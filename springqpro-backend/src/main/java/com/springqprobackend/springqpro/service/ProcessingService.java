@@ -17,6 +17,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Timer;
 
 import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
@@ -89,12 +91,21 @@ public class ProcessingService {
     private final RedisDistributedLock redisLock;   // 2025-11-23-DEBUG: REDIS INTEGRATION PHASE!
     private final TaskRedisRepository cache;    // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java
 
+    // 2025-11-26-NOTE:+DEBUG: METRICS PHASE FIELD ADDITIONS:
+    private final Counter tasksSubmittedCounter;
+    private final Counter tasksClaimedCounter;
+    private final Counter tasksCompletedCounter;
+    private final Counter tasksFailedCounter;
+    private final Counter tasksRetriedCounter;
+    private final Timer processingTimer;
+
     @PersistenceContext
     private EntityManager em;   // 2025-11-17-DEBUG: Need this for flush() and refresh(), which is professionally commonplace when working with Spring to enforce ordering.
 
     // Constructor(s):
     @Lazy
-    public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, TaskMapper taskMapper, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueService queueService, RedisDistributedLock redisLock, TaskRedisRepository cache) {
+    public ProcessingService(TaskRepository taskRepository, TaskHandlerRegistry handlerRegistry, TaskMapper taskMapper, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueService queueService, RedisDistributedLock redisLock, TaskRedisRepository cache,
+                             Counter tasksSubmittedCounter, Counter tasksClaimedCounter, Counter tasksCompletedCounter, Counter tasksFailedCounter, Counter tasksRetriedCounter, Timer processingTimer) {
         this.taskRepository = taskRepository;
         this.handlerRegistry = handlerRegistry;
         this.taskMapper = taskMapper;
@@ -102,6 +113,13 @@ public class ProcessingService {
         this.queueService = queueService;
         this.redisLock = redisLock;
         this.cache = cache;
+        // 2025-11-17-DEBUG:+NOTE: METRICS PHASE ADDITIONS:
+        this.tasksSubmittedCounter = tasksSubmittedCounter;
+        this.tasksClaimedCounter = tasksClaimedCounter;
+        this.tasksCompletedCounter = tasksCompletedCounter;
+        this.tasksFailedCounter = tasksFailedCounter;
+        this.tasksRetriedCounter = tasksRetriedCounter;
+        this.processingTimer = processingTimer;
     }
 
     // 2025-11-23-DEBUG: OVERHAULING MY claimAndProcess METHOD LOGIC [BELOW]:
@@ -116,6 +134,9 @@ public class ProcessingService {
             return;
         }
         logger.info("[ProcessingService] starting claimAndProcess for {}", taskId);
+
+        tasksSubmittedCounter.increment();  // DEBUG: METRICS ADDITION.
+
         // Load current in-DB Task snapshot (it'll be "frozen" as QUEUED until this method "claims" it):
         // NOTE: As alluded to, this is basically replacing the "Thread dequeues as processes a Task" functionality of QueueService.
         Optional<TaskEntity> snapshot = taskRepository.findById(taskId);    // NOTE: Remember this is a built-in function when you extend JPA.
@@ -129,6 +150,8 @@ public class ProcessingService {
             logger.warn("[ProcessingService] claim for {} failed (transition returned 0) — likely status mismatch", taskId);
             return; // Claim failed: already claimed or status has been changed.
         }
+
+        tasksClaimedCounter.increment();    // DEBUG: METRICS ADDITION.
 
         em.flush();
         em.refresh(current);
@@ -153,13 +176,20 @@ public class ProcessingService {
 
         // try-catch-block to do the processing:
         try {
-            TaskHandler handler = handlerRegistry.getHandler(model.getType().name());
-            if(handler == null) handler = handlerRegistry.getHandler("DEFAULT");
-            handler.handle(model);
+            /* 2025-11-26-NOTE: [METRICS RELATED]:
+            Need to use recordCallable to wrap the stuff when exceptions are possible. standard "callable"
+            won't propogate the exception to the outer try-catch block (it'll swallow the damn thing!). */
+            processingTimer.recordCallable(() -> {
+                TaskHandler handler = handlerRegistry.getHandler(model.getType().name());
+                if (handler == null) handler = handlerRegistry.getHandler("DEFAULT");
+                handler.handle(model);
+                return null;    // something needs to be returned for recordCallable.
+            });
             model.setStatus(TaskStatus.COMPLETED);
             taskMapper.updateEntity(model, claimed);    // 2025-11-15-EDIT: ADDED THIS!
             TaskEntity persisted = taskRepository.save(claimed);
             cache.put(claimed); // 2025-11-23-DEBUG: REFACTORING FOR TaskRedisRepository.java
+            tasksCompletedCounter.increment();  // 2025-11-26-NOTE: METRICS ADDITION!
             logger.info("[ProcessingService] after save - id: {}, status: {}, attempts: {}, version: {}", persisted.getId(), persisted.getStatus(), persisted.getAttempts(), persisted.getVersion());
         } catch(Exception ex) {
             // ProcessingService catches Task FAILs gracefully - marking it as FAILED, persisting it, and re-enqueuing it with backoff.
@@ -168,6 +198,7 @@ public class ProcessingService {
             taskMapper.updateEntity(model, claimed);
             taskRepository.save(claimed);
             cache.put(claimed); // 2025-11-23-DEBUG: REFACTORING FOR TaskRedisRepository.java
+            tasksFailedCounter.increment(); // 2025-11-26-NOTE: METRICS ADDITION!
 
             em.flush();
             em.refresh(claimed);
@@ -180,6 +211,7 @@ public class ProcessingService {
                 set the Status back to QUEUED; it remains FAILED so this method simply cannot run properly. That's why my Integration Test re-enqueing keeps messing up. */
                 int requeued = taskRepository.transitionStatusSimple(taskId, TaskStatus.FAILED, TaskStatus.QUEUED);
                 logger.info("[ProcessingService] requeue DB update for {} returned {}", taskId, requeued);
+                tasksRetriedCounter.increment();    // 2025-11-26-NOTE: METRICS ADDITION!
                 scheduler.schedule(() -> queueService.enqueueById(taskId), delayMs, TimeUnit.MILLISECONDS);
             } else {
                 // permanent failure:

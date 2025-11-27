@@ -58,7 +58,6 @@ public class AuthJwtIntegrationTest {
     private WebTestClient webTestClient;
     @Autowired
     private StringRedisTemplate redis;
-
     @Value("${jwt.secret}")
     private String jwtSecret;   // will be used for test that forges an expired JWT.
 

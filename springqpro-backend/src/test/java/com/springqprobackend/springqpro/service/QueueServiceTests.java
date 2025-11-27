@@ -6,6 +6,7 @@ import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.repository.TaskRepository;
+import io.micrometer.core.instrument.Counter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -68,7 +69,10 @@ public class QueueServiceTests {
     private TaskRepository taskRepo;
     @Mock
     private ProcessingService proService;
-
+    @Mock
+    private Counter queueEnqueueCounter;
+    @Mock
+    private Counter queueEnqueueByIdCounter;
     private QueueService queue;
     private Task t;
 
@@ -87,7 +91,7 @@ public class QueueServiceTests {
         ExecutorService immediateExecutor = new DirectExecutorService();
         //when(props.getMainExecWorkerCount()).thenReturn(5);
         //when(props.getSchedExecWorkerCount()).thenReturn(1);
-        queue = new QueueService(immediateExecutor, handlerRegistry, taskRepo, proService, props);   // Manually constructing the queue (which is why there's no annotation above it earlier).
+        queue = new QueueService(immediateExecutor, handlerRegistry, taskRepo, proService, props, queueEnqueueCounter, queueEnqueueByIdCounter);   // Manually constructing the queue (which is why there's no annotation above it earlier).
         // Init Task w/ no-args constructor:
         t = new Task();
         // id and type fields are the ubiquitous fields for testing (e.g., for identification):
@@ -194,7 +198,7 @@ public class QueueServiceTests {
     @Test
     void shutdown_shouldTerminateExecutorService() throws InterruptedException {
         when(mockExecutor.awaitTermination(anyLong(), any())).thenReturn(true);
-        QueueService queueService = new QueueService(mockExecutor, handlerRegistry, taskRepo, proService, props);
+        QueueService queueService = new QueueService(mockExecutor, handlerRegistry, taskRepo, proService, props, queueEnqueueCounter, queueEnqueueByIdCounter);
         queueService.shutdown();    // voila.
 
         verify(mockExecutor).shutdown();
@@ -205,7 +209,7 @@ public class QueueServiceTests {
     @Test
     void shutdown_shouldTerminate_ifTimeoutOccurs() throws InterruptedException {
         when(mockExecutor.awaitTermination(anyLong(), any())).thenReturn(false); // simulate timeout.
-        QueueService service = new QueueService(mockExecutor, handlerRegistry, taskRepo, proService, props);
+        QueueService service = new QueueService(mockExecutor, handlerRegistry, taskRepo, proService, props, queueEnqueueCounter, queueEnqueueByIdCounter);
         service.shutdown();
 
         verify(mockExecutor).shutdown();
@@ -217,7 +221,7 @@ public class QueueServiceTests {
     void shutdown_shouldForceTerminate_ifInterrupted() throws InterruptedException {
         when(mockExecutor.awaitTermination(anyLong(), any())).thenThrow(new InterruptedException("simulated interruption"));
 
-        QueueService service = new QueueService(mockExecutor, handlerRegistry, taskRepo, proService, props);
+        QueueService service = new QueueService(mockExecutor, handlerRegistry, taskRepo, proService, props, queueEnqueueCounter, queueEnqueueByIdCounter);
         service.shutdown();
 
         verify(mockExecutor).shutdown();
