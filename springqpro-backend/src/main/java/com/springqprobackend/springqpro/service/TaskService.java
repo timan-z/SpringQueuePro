@@ -52,7 +52,13 @@ public class TaskService {
     // NOTE: This is the new "entry point" used by GraphQL and I guess the JWT-protected REST stuff (but mainly GraphQL of course).
     @Transactional
     public TaskEntity createTaskForUser(String payload, TaskType type, String ownerEmail) {
+
+        logger.info("DEBUG:[createTaskForUser] where's the problem - 1");
+
         apiTaskCreateCounter.increment();   // 2025-11-26-NOTE: METRICS ADDITION!
+
+        logger.info("DEBUG:[createTaskForUser] where's the problem - 2");
+
         TaskEntity entity = new TaskEntity(
                 "Task-" + System.nanoTime(),
                 payload,
@@ -63,7 +69,13 @@ public class TaskService {
                 Instant.now(),
                 ownerEmail
         );
+
+        logger.info("DEBUG:[createTaskForUser] where's the problem - 3");
+
         repository.save(entity);
+
+        logger.info("DEBUG:[createTaskForUser] where's the problem - 4");
+
         // Map to in-memory Task model for existing queue/handlers
         Task task = new Task(
                 entity.getId(),
@@ -75,8 +87,14 @@ public class TaskService {
                 entity.getCreatedAt(),
                 entity.getCreatedBy()
         );
-        //queueService.enqueue(task);
-        queueService.enqueueById(entity.getId());
+
+        logger.info("DEBUG:[createTaskForUser] where's the problem - 5");
+
+        queueService.enqueue(task);
+        //queueService.enqueueById(entity.getId());
+
+        logger.info("DEBUG:[createTaskForUser] where's the problem - 6");
+
         return entity;
     }
     // 2025-11-25-DEBUG: JWT USER OWNERSHIP-RELATED REFACTORING METHODS:

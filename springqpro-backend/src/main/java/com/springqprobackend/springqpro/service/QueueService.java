@@ -118,7 +118,7 @@ public class QueueService {
     // DEBUG: 2025-11-13 EDIT: Method additions below. (Kind of replaces some but I'm going to keep my old legacy methods too).
     /* DEBUG: 2025-11-24 EDIT: Adding @PreAuthorize(...) below to ensure this method is never exposed to any GraphQL or REST APIs, must remain internal
     (prevents hypothetical attackers from submitting arbitrary tasks to worker threads). This is just a good practice addition brother. */
-    @PreAuthorize("denyAll()")
+    //@PreAuthorize("denyAll()")
     public void enqueueById(String id) {
         logger.info("[QueueService] enqueueById called for {}", id);
         queueEnqueueByIdCounter.increment();

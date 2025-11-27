@@ -63,7 +63,7 @@ public class TaskGraphQLController {
 
     // MUTATIONS:
     @MutationMapping
-    @PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
+    //@PreAuthorize("isAuthenticated()")  // 2025-11-24-DEBUG: Securing my GraphQL resolvers for JWT.
     public TaskEntity createTask(@Argument("input") CreateTaskInput input, Authentication auth) {
         String owner = auth.getName();
         logger.info("INFO: GraphQL 'createTask' Query sent by user:{}", owner);
@@ -92,9 +92,10 @@ public class TaskGraphQLController {
         return taskService.deleteTask(id);
     }
 
-    @SchemaMapping(typeName = "Task", field = "payload")
+    // 2025-11-17-DEBUG: I can't remember why the thing below was added.
+    /*@SchemaMapping(typeName = "Task", field = "payload")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public String securePayload(TaskEntity entity) {
         return entity.getPayload();
-    }
+    }*/
 }
