@@ -1,5 +1,7 @@
 package com.springqprobackend.springqpro.redis;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -18,6 +20,7 @@ SO BASICALLY, safe lock happens using SET NX PX, and we use a Lua script to unlo
 public class RedisDistributedLock {
     // Field(s):
     //private final RedisTemplate<String, Object> redis;
+    private static final Logger logger = LoggerFactory.getLogger(RedisDistributedLock.class);
     private final StringRedisTemplate redis;
     private final DefaultRedisScript<Long> releaseScript;
     // Constructor(s):
@@ -37,11 +40,13 @@ public class RedisDistributedLock {
     public String tryLock(String key, long ttlMs) {
         String token = UUID.randomUUID().toString();
         Boolean ok = redis.opsForValue().setIfAbsent(key, token, Duration.ofMillis(ttlMs));
+        logger.info("[RedisLock] TRY key={} token={} success={}", key, token, ok);
         if(Boolean.TRUE.equals(ok)) return token;
         return null;
     }
     public boolean unlock(String key, String token) {
         Long res = redis.execute(releaseScript, Collections.singletonList(key), token);
+        logger.info("[RedisLock] UNLOCK key={} token={} -> {}", key, token, res);
         return res != null && res > 0;
     }
 }

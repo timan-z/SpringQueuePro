@@ -109,6 +109,7 @@ public class TaskService {
         logger.info("[TaskService] published TaskCreatedEvent for {}", entity.getId());
         return entity;
     }
+    // 2025-11-25-DEBUG: Method above is 100% legacy code now...
 
     public List<TaskEntity> getAllTasks(TaskStatus status) {
         // 2025-11-23-DEBUG: List queries should return DB-focused.
@@ -125,8 +126,14 @@ public class TaskService {
 
     public Optional<TaskEntity> getTask(String id) {
         // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java (and Redis in general). Better to retrieve Task via ID from Cache!
+        logger.info("[TaskService][getTask] About to look in TaskRedisRepository (Redis Cache) for Task by id:{}", id);
         TaskEntity cached = cache.get(id);
-        if(cached != null) return Optional.of(cached);
+        if(cached != null) {
+            logger.info("[TaskService][getTask] Task (id:{}) WAS found in TaskRedisRepository (Redis Cache)", id);
+            return Optional.of(cached);
+        } else {
+            logger.info("[TaskService][getTask] Task (id:{}) was NOT found in TaskRedisRepository (Redis Cache). It will NOW be cached!", id);
+        }
         Optional<TaskEntity> fromDB = repository.findById(id);
         fromDB.ifPresent(cache::put);   // 2025-11-23-DEBUG: IMPORTANT! If Task is not in the cache but in DB, after retrieving it, save it to the cache...
         return fromDB;
@@ -139,7 +146,9 @@ public class TaskService {
             task.setStatus(newStatus);
             task.setAttempts(updAttempts);
             repository.save(task);
+            logger.info("[TaskService][updateStatus] Updates to Task (id:{}) synced to the TaskRepository.", id);
             cache.put(task);    // 2025-11-23-DEBUG: SYNC THE CACHE!
+            logger.info("[TaskService][updateStatus] Updates to Task (id:{}) cached to TaskRedisRepository (Redis Cache).", id);
         });
     }
 
@@ -148,7 +157,9 @@ public class TaskService {
         // 2025-11-23-DEBUG: Edit method deleteTask(...) to sync the cache:
         if (repository.existsById(id)) {
             repository.deleteById(id);
+            logger.info("[TaskService][deleteTask] Task (id:{}) has been deleted from TaskRepository.", id);
             cache.delete(id);   // 2025-11-23-DEBUG: SYNC THE CACHE!
+            logger.info("[TaskService][deleteTask] Task (id:{}) has been deleted from TaskRedisRepository (Redis Cache).", id);
             return true;
         }
         return false;

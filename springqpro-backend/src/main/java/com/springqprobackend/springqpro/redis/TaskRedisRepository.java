@@ -1,6 +1,9 @@
 package com.springqprobackend.springqpro.redis;
 
 import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.service.TaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -19,6 +22,7 @@ import java.time.Duration;
 @Repository
 public class TaskRedisRepository {
     // Field(s):
+    private static final Logger logger = LoggerFactory.getLogger(TaskRedisRepository.class);
     private static final String TASK_KEY_PREFIX = "task:";
     private final RedisTemplate<String, Object> redis;
     private final Duration ttl;
@@ -31,17 +35,23 @@ public class TaskRedisRepository {
     private String key(String id) {
         return TASK_KEY_PREFIX + id;
     }
+
     public void put(TaskEntity entity) {
         if(entity == null || entity.getId() == null) return;
+        logger.info("[TaskRedisRepository](aka RedisCache) PUT {}", entity.getId());
         redis.opsForValue().set(key(entity.getId()), entity, ttl);
     }
+
     public TaskEntity get(String id) {
         Object o = redis.opsForValue().get(key(id));
         if(o == null || !(o instanceof TaskEntity)) return null;    // DEBUG: Maybe add logs too or something.
         if(o instanceof TaskEntity) return (TaskEntity) o;
+        logger.info("[TaskRedisRepository](aka RedisCache) GET {}", id);
         return null;
     }
+
     public void delete(String id) {
+        logger.info("[TaskRedisRepository](aka RedisCache) DELETE {}", id);
         redis.delete(key(id));
     }
     // DEBUG:+NOTE:+TO-DO: I can add other methods like exists(), setIfAbsent() and so on...
