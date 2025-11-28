@@ -1,0 +1,99 @@
+services:
+  # --- PostgreSQL (Application DB) ---
+  db:
+    image: postgres:18
+    container_name: springqpro-db
+    restart: always
+    environment:
+      POSTGRES_USER: springqpro
+      POSTGRES_PASSWORD: springqpro
+      POSTGRES_DB: springqpro
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - springqpro-net
+
+  # --- Redis (Locks + Refresh Tokens + Caching) ---
+  redis:
+    image: redis:7.2
+    container_name: springqpro-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"   # Optional: expose for debugging; you can remove in production
+    networks:
+      - springqpro-net
+
+  # --- SpringQueuePro Application ---
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: springqpro-app
+    restart: always
+    depends_on:
+      - db
+      - redis
+    environment:
+      # --- Spring profile (tweak this for profile-specific configs) ---
+      SPRING_PROFILES_ACTIVE: production
+
+      # --- Database configuration (hostname is the service name "db") ---
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/springqpro
+      SPRING_DATASOURCE_USERNAME: springqpro
+      SPRING_DATASOURCE_PASSWORD: springqpro
+
+      # --- Redis configuration (hostname is "redis") ---
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      # --- Actuator base path / security tweaks can go here later ---
+    ports:
+      - "8080:8080"   # Expose app to host
+    networks:
+      - springqpro-net
+
+  # --- Prometheus (scrapes /actuator/prometheus) ---
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: springqpro-prometheus
+    restart: always
+    depends_on:
+      - app
+    volumes:
+      # You will create prometheus.yml next to this compose file
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"   # Prometheus UI
+    networks:
+      - springqpro-net
+
+  # --- Grafana (Dashboards on top of Prometheus) ---
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: springqpro-grafana
+    restart: always
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SERVER_ROOT_URL: http://localhost:3000
+    ports:
+      - "3000:3000"   # Grafana UI
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - springqpro-net
+
+# --- Volumes for persistence ---
+volumes:
+  pgdata:
+  grafana-data:
+
+# --- Shared network for internal service DNS ---
+networks:
+  springqpro-net:
+    driver: bridge

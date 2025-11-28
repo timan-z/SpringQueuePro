@@ -11,6 +11,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ProcessingMetricsConfig {
     @Bean
+    public Counter tasksSubmittedManuallyCounter(MeterRegistry registry) {
+        return Counter.builder("springqpro_tasks_submitted_manually_total")
+                .description("Total tasks submitted/created manually e.g., GraphQL queries (not including re-enqueued tasks).")
+                .register(registry);
+    }   // <-- NOTE:+TO-DO: I have not yet wired this one in... going to wait until implementing the React frontend (not sure where to place this for incrementation as of now).
+    @Bean
     public Counter tasksSubmittedCounter(MeterRegistry registry) {
         return Counter.builder("springqpro_tasks_submitted_total")
                 .description("Total tasks submitted/created.")
