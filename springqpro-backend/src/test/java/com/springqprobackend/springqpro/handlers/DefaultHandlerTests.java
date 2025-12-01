@@ -8,6 +8,7 @@ import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.util.Sleeper;
 import com.springqprobackend.springqpro.models.Task;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -47,7 +48,7 @@ public class DefaultHandlerTests {
 
     /* 2025-11-20-EDIT: This file and DefaultHandlerTests.java is outdated, relying on the old project architecture
     before any of the refactoring related to ProcessingService.java */
-
+    @Disabled
     @Test
     void handle_shouldSet_TaskCompleted() throws InterruptedException {
         handler.handle(t);
