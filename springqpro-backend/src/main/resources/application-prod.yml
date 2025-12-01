@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${POSTGRES_URL}
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
+    url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
+    username: ${PGUSER}
+    password: ${PGPASSWORD}
 
   jpa:
     hibernate:
@@ -13,9 +13,9 @@ spring:
         format_sql: false
 
 redis:
-  host: ${REDIS_HOST}
-  port: ${REDIS_PORT}
-  password: ${REDIS_PASSWORD:}
+  host: ${REDISHOST}
+  port: ${REDISPORT}
+  password: ${REDISPASSWORD}
 
 jwt:
   secret: ${JWT_SECRET}
