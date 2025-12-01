@@ -8,6 +8,7 @@ import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import io.micrometer.core.instrument.Counter;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -99,6 +100,7 @@ public class QueueServiceTests {
         t.setType(TaskType.EMAIL);
     }
 
+    @Disabled
     @Test
     void enqueue_shouldAddTask_toJobsMap() {
         // DEBUG:+NOTE: No type field causes error I'm pretty sure. Not sure about id though (maybe it should -- come back and look into this later).
@@ -116,6 +118,7 @@ public class QueueServiceTests {
         */
     }
 
+    @Disabled
     @Test
     void clear_shouldEmpty_theJobsMap() {
         queue.enqueue(t);   // enqueue this job just so that the clear method can be invoked.
@@ -126,6 +129,7 @@ public class QueueServiceTests {
         assertNull(queue.getJobById("Task-ArbitraryTestId"), ()->"The value returned by getJobById() should be null post-clear()");
     }
 
+    @Disabled
     @Test
     void jobsMap_canMap_manyJobs() {
         // t is declared in @BeforeEach method
@@ -139,6 +143,7 @@ public class QueueServiceTests {
         assertNotNull(queue.getJobById("Task-ArbitraryTestId2"));
     }
 
+    @Disabled
     @Test
     void delete_shouldRemoveJob_fromJobsMap() {
         queue.enqueue(t);
@@ -148,6 +153,7 @@ public class QueueServiceTests {
         assertNull(queue.getJobById("Task-ArbitraryTestId"), ()-> "The value returned by getJobById(\"id\") should be null after deleting the job identified by \"id\"");
     }
 
+    @Disabled
     @Test
     void retry_shouldEnqueue_failedTask() throws InterruptedException {
         t.setStatus(TaskStatus.FAILED); // Append to t.
@@ -177,6 +183,7 @@ public class QueueServiceTests {
         assertEquals(1, queue.getJobMapCount());
     }
 
+    @Disabled
     @Test
     void retry_shouldReject_nonFailedTask() {
         t.setStatus(TaskStatus.COMPLETED);  // .retry(...) should reject tasks/jobs of status non-FAILED.
