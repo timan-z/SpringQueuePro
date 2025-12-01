@@ -1,10 +1,14 @@
 package com.springqprobackend.springqpro.handlers;
 
+// 2025-11-30-NOTE: Basically shouldn't be testing Handlers anymore. This is kept for my documentation stuff.
+
 import com.springqprobackend.springqpro.config.TaskHandlerProperties;
+import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.util.Sleeper;
 import com.springqprobackend.springqpro.models.Task;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -44,9 +48,9 @@ public class DefaultHandlerTests {
     /* 2025-11-20-EDIT: This file and DefaultHandlerTests.java is outdated, relying on the old project architecture
     before any of the refactoring related to ProcessingService.java */
 
-    /*@Test
+    @Test
     void handle_shouldSet_TaskCompleted() throws InterruptedException {
         handler.handle(t);
         assertEquals(TaskStatus.COMPLETED, t.getStatus());
-    }*/
+    }
 }

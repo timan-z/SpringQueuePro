@@ -1,9 +1,12 @@
 package com.springqprobackend.springqpro.integration;
 
 import com.springqprobackend.springqpro.domain.entity.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.UserEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.repository.TaskRepository;
+import com.springqprobackend.springqpro.repository.UserRepository;
+import com.springqprobackend.springqpro.security.JwtUtil;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,9 +69,26 @@ class TaskGraphQLIntegrationTest extends IntegrationTestBase {
     @Autowired
     private TaskRepository taskRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    private static final String TEST_EMAIL = "graphql-test@example.com";
+
     @BeforeEach
     void init() {
         taskRepository.deleteAll();
+        userRepository.deleteAll();
+        // Create a user so SecurityContext + ownership is valid
+        userRepository.save(new UserEntity(
+                TEST_EMAIL,
+                "{noop}password" // password not used here; we just need a valid user record
+        ));
+        // Generate a valid JWT for that user
+        String token = jwtUtil.generateAccessToken(TEST_EMAIL);
+
         WebTestClient client = WebTestClient.bindToServer()
                 .baseUrl("http://localhost:" + port + "/graphql")
                 .exchangeStrategies(
@@ -76,6 +96,7 @@ class TaskGraphQLIntegrationTest extends IntegrationTestBase {
                                 .codecs(c -> c.defaultCodecs().maxInMemorySize(5_000_000))
                                 .build()
                 )
+                .defaultHeader("Authorization", "Bearer " + token)
                 .build();
         this.graphQlTester = HttpGraphQlTester.create(client);
     }
@@ -141,7 +162,8 @@ class TaskGraphQLIntegrationTest extends IntegrationTestBase {
                 TaskStatus.QUEUED,
                 0,
                 3,
-                Instant.now()
+                Instant.now(),
+                TEST_EMAIL
         );
         taskRepository.save(entity);
         // Manually change the status of entity to COMPLETED and increment attempts:
@@ -178,7 +200,8 @@ class TaskGraphQLIntegrationTest extends IntegrationTestBase {
                 TaskStatus.QUEUED,
                 0,
                 3,
-                Instant.now()
+                Instant.now(),
+                TEST_EMAIL
         );
         taskRepository.save(entity);
         String mutation = """
@@ -197,15 +220,15 @@ class TaskGraphQLIntegrationTest extends IntegrationTestBase {
     void filterTasks_byStatusQuery_returnsCorrectList() {
         // Task #1:
         taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-1","Send an email", TaskType.EMAIL, TaskStatus.QUEUED, 0, 3, Instant.now())
+                new TaskEntity("Task-ArbitraryTaskId-1","Send an email", TaskType.EMAIL, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
         );
         // Task #2:
         taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-2", "Send an email 2", TaskType.EMAIL, TaskStatus.COMPLETED, 1, 3, Instant.now())
+                new TaskEntity("Task-ArbitraryTaskId-2", "Send an email 2", TaskType.EMAIL, TaskStatus.COMPLETED, 1, 3, Instant.now(), TEST_EMAIL)
         );
         // Task #3:
         taskRepository.save(
-                new TaskEntity("Task-ArbitaryTaskId-3", "Send an SMS or whatever", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now())
+                new TaskEntity("Task-ArbitaryTaskId-3", "Send an SMS or whatever", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
         );
         String query = """
                 query {
@@ -226,19 +249,19 @@ class TaskGraphQLIntegrationTest extends IntegrationTestBase {
     void filterTasks_byTypeQuery_returnsCorrectList() {
         // Task #1:
         taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-1","Do something NEWSLETTER related, I don't know.", TaskType.NEWSLETTER, TaskStatus.QUEUED, 0, 3, Instant.now())
+                new TaskEntity("Task-ArbitraryTaskId-1","Do something NEWSLETTER related, I don't know.", TaskType.NEWSLETTER, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
         );
         // Task #2:
         taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-2", "Do something NEWSLETTER related, I don't know 2.", TaskType.NEWSLETTER, TaskStatus.COMPLETED, 1, 3, Instant.now())
+                new TaskEntity("Task-ArbitraryTaskId-2", "Do something NEWSLETTER related, I don't know 2.", TaskType.NEWSLETTER, TaskStatus.COMPLETED, 1, 3, Instant.now(), TEST_EMAIL)
         );
         // Task #3:
         taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-3", "Send an SMS or whatever", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now())
+                new TaskEntity("Task-ArbitraryTaskId-3", "Send an SMS or whatever", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
         );
         // Task #4:
         taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-4", "Do something NEWSLETTER related, I don't know 3.", TaskType.NEWSLETTER, TaskStatus.QUEUED, 0, 3, Instant.now())
+                new TaskEntity("Task-ArbitraryTaskId-4", "Do something NEWSLETTER related, I don't know 3.", TaskType.NEWSLETTER, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
         );
         String query = """
                 query {

@@ -6,9 +6,11 @@ import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.handlers.TaskHandler;
 import com.springqprobackend.springqpro.repository.TaskRepository;
+import com.springqprobackend.springqpro.repository.UserRepository;
 import com.springqprobackend.springqpro.service.TaskService;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,29 +48,21 @@ with it directly in your test methods. [And all of this on @SpyBean was taken fr
 */
 // 2025-11-17-EDIT: This Test Case is poorly implemented and won't work because it don't account for my backoffMs delay thing in ProcessingService.java !!!
 //@Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "spring.main.allow-bean-definition-overriding=true")
+//@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "spring.main.allow-bean-definition-overriding=true")
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "spring.main.allow-bean-definition-overriding=true"
+)
 class RetryBehaviorIntegrationTest extends IntegrationTestBase {
     // Field(s):
     private static final Logger logger = LoggerFactory.getLogger(RetryBehaviorIntegrationTest.class);
-
-    // NOTE: All the values provided below are just the arbitrary ones from docker_compose.yml:
-    /*@Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18")
-            .withDatabaseName("springqpro")
-            .withUsername("springqpro")
-            .withPassword("springqpro");
-
-    @DynamicPropertySource
-    static void overrideProps(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-    }*/
 
     @Autowired
     private TaskService taskService;
     @Autowired
     private TaskRepository taskRepository;
+    @Autowired
+    private UserRepository userRepository;
 
     // Inject deterministic test handler for FAIL type in place of the real FailHandler class.
     @TestConfiguration
@@ -86,23 +80,31 @@ class RetryBehaviorIntegrationTest extends IntegrationTestBase {
     @BeforeEach
     void cleanDb() {
         taskRepository.deleteAll();
+        if (!userRepository.existsById("retrytest@example.com")) {
+            userRepository.save(new com.springqprobackend.springqpro.domain.entity.UserEntity(
+                    "retrytest@example.com",
+                    "{noop}password"     // encoder is irrelevant: we never authenticate in this test
+            ));
+        }
     }
 
+    // 2025-11-30-NOTE: Test below is architecturally outdated.
     // 2025-11-17-DEBUG: Renaming the Test name. (Checking that it's QUEUED is more accurate than checking if it's FAILED).
+    //@Disabled
     @Test
     void failingTask_isRequeued_andRetryScheduled() {
         // 1. MAKE TASK:
-        TaskEntity entity = taskService.createTask("RETRY TEST", TaskType.FAIL);
+        TaskEntity entity = taskService.createTaskForUser("RETRY TEST", TaskType.FAIL, "random_email@gmail.com");
         String id = entity.getId();
 
         // WAIT FOR FIRST FAILURE:
-        Awaitility.await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(5)).pollInterval(Duration.ofMillis(250)).untilAsserted(() -> {
             TaskEntity e = taskRepository.findById(id).orElseThrow();
             assertThat(e.getStatus()).isEqualTo(TaskStatus.QUEUED); // <-- EDIT: Pretty sure this should actually check to see if it was QUEUED and not FAILED (to imply that requeue is coming).
             assertThat(e.getAttempts()).isGreaterThanOrEqualTo(1);
         });
         // WAIT FOR REQUEUE + SECOND ATTEMPT -> ATTEMPTS INCREASED:
-        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(250)).untilAsserted(() -> {
             TaskEntity e = taskRepository.findById(id).orElseThrow();
             assertThat(e.getAttempts()).isGreaterThanOrEqualTo(2);
         });

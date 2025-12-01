@@ -2,6 +2,7 @@ package com.springqprobackend.springqpro.integration;
 
 import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskType;
+import com.springqprobackend.springqpro.redis.RedisDistributedLock;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.service.ProcessingService;
 import com.springqprobackend.springqpro.service.TaskService;
@@ -58,6 +59,8 @@ class ProcessingConcurrencyIntegrationTest extends IntegrationTestBase {
     private TaskRepository taskRepository;
     @Autowired
     private ProcessingService processingService;
+    @Autowired
+    private RedisDistributedLock redisLock;
 
     @BeforeEach
     void cleanDb() {
@@ -66,9 +69,8 @@ class ProcessingConcurrencyIntegrationTest extends IntegrationTestBase {
 
     @Test
     void twoThreads_tryToClaim_sameTask_onlyOneSucceeds() throws InterruptedException, ExecutionException {
-        TaskEntity entity = taskService.createTask("concurrency-test", TaskType.EMAIL);
+        TaskEntity entity = taskService.createTaskForUser("concurrency-test", TaskType.EMAIL, "random_email@gmail.com");
         String id = entity.getId();
-
         ExecutorService esDummy = Executors.newFixedThreadPool(2);
         Callable<Void> c = () -> {
             processingService.claimAndProcess(id);

@@ -5,6 +5,7 @@ import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
+
+// 2025-11-30: This Integration Test is testing outdated architecture. Keeping it for now because it should be noted in my documentation.
 
 /* NOTE(S)-TO-SELF:
 - @Testcontainers enables Container Lifecycle Support in JUnit.
@@ -61,6 +64,7 @@ class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
         taskRepository.deleteAll();
     }
 
+    @Disabled
     @Test
     void createTask_isPersisted_andEventuallyProcessed() {
         // Starting w/ creating Task via REST endpoint (my ProducerController's POST /enqueue):
