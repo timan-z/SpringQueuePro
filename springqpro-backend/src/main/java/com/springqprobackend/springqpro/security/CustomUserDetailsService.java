@@ -1,6 +1,6 @@
 package com.springqprobackend.springqpro.security;
 
-import com.springqprobackend.springqpro.domain.UserEntity;
+import com.springqprobackend.springqpro.domain.entity.UserEntity;
 import com.springqprobackend.springqpro.repository.UserRepository;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;

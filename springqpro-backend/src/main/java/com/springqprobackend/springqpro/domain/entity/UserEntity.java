@@ -1,4 +1,4 @@
-package com.springqprobackend.springqpro.domain;
+package com.springqprobackend.springqpro.domain.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

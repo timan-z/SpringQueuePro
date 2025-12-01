@@ -1,13 +1,10 @@
 package com.springqprobackend.springqpro.handlers;
 
 import com.springqprobackend.springqpro.config.TaskHandlerProperties;
-import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
-import com.springqprobackend.springqpro.interfaces.Sleeper;
-import com.springqprobackend.springqpro.interfaces.TaskHandler;
+import com.springqprobackend.springqpro.util.Sleeper;
 import com.springqprobackend.springqpro.models.Task;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;

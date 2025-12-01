@@ -1,6 +1,6 @@
 package com.springqprobackend.springqpro.integration;
 
-import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.repository.TaskRepository;
@@ -18,7 +18,6 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 
 import java.time.Instant;
-import java.util.concurrent.*;
 
 /* 2025-11-17-NOTE(S)-TO-SELF:
 - GraphQlTester is Spring's testing utility for GraphQL endpoints.

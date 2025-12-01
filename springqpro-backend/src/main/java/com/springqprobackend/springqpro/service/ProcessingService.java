@@ -1,8 +1,8 @@
 package com.springqprobackend.springqpro.service;
 
-import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
-import com.springqprobackend.springqpro.interfaces.TaskHandler;
+import com.springqprobackend.springqpro.handlers.TaskHandler;
 import com.springqprobackend.springqpro.mapper.TaskMapper;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;

@@ -1,10 +1,9 @@
 package com.springqprobackend.springqpro.service;
 
-import com.springqprobackend.springqpro.domain.*;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
-import com.springqprobackend.springqpro.events.TaskCreatedEvent;
-import com.springqprobackend.springqpro.models.Task;
+import com.springqprobackend.springqpro.domain.event.TaskCreatedEvent;
 import com.springqprobackend.springqpro.redis.TaskRedisRepository;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import org.slf4j.Logger;

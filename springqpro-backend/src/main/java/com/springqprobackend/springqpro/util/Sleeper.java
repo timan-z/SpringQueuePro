@@ -1,4 +1,4 @@
-package com.springqprobackend.springqpro.interfaces;
+package com.springqprobackend.springqpro.util;
 
 @FunctionalInterface
 public interface Sleeper {

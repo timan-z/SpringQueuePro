@@ -1,10 +1,10 @@
 package com.springqprobackend.springqpro.integration;
 
-import com.springqprobackend.springqpro.config.TaskProcessingException;
-import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.domain.exception.TaskProcessingException;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
-import com.springqprobackend.springqpro.interfaces.TaskHandler;
+import com.springqprobackend.springqpro.handlers.TaskHandler;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.service.TaskService;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
@@ -17,11 +17,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 import java.time.Duration;

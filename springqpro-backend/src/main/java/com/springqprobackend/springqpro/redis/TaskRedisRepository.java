@@ -1,12 +1,10 @@
 package com.springqprobackend.springqpro.redis;
 
-import com.springqprobackend.springqpro.domain.TaskEntity;
-import com.springqprobackend.springqpro.service.TaskService;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
 import java.time.Duration;
 

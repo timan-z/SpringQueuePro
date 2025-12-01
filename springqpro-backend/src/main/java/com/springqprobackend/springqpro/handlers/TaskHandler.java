@@ -1,4 +1,4 @@
-package com.springqprobackend.springqpro.interfaces;
+package com.springqprobackend.springqpro.handlers;
 
 import com.springqprobackend.springqpro.models.Task;
 

@@ -1,6 +1,6 @@
 package com.springqprobackend.springqpro.repository;
 
-import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import org.springframework.data.jpa.repository.JpaRepository;

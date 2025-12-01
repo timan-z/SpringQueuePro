@@ -3,7 +3,7 @@ package com.springqprobackend.springqpro.runtime;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
-import com.springqprobackend.springqpro.interfaces.TaskHandler;
+import com.springqprobackend.springqpro.handlers.TaskHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -1,6 +1,5 @@
-package com.springqprobackend.springqpro.models;
+package com.springqprobackend.springqpro.util;
 
-import com.springqprobackend.springqpro.interfaces.Sleeper;
 import org.springframework.stereotype.Component;
 
 /* NOTE: So, from what I understand, this file -- a concrete implementation of the Sleeper interface -- is

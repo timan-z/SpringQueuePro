@@ -4,7 +4,7 @@ package com.springqprobackend.springqpro.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.redis.testcontainers.RedisContainer;
-import com.springqprobackend.springqpro.security.AuthResponse;
+import com.springqprobackend.springqpro.security.dto.AuthResponse;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;

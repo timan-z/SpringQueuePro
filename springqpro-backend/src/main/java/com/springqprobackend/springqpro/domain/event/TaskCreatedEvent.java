@@ -1,4 +1,4 @@
-package com.springqprobackend.springqpro.events;
+package com.springqprobackend.springqpro.domain.event;
 
 // DEBUG:+NOTE:+TO-DO: Maybe merge this and the other records file I have for the GraphQL stuff.
 

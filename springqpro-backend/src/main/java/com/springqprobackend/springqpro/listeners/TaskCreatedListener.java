@@ -1,8 +1,7 @@
 package com.springqprobackend.springqpro.listeners;
 
-import com.springqprobackend.springqpro.events.TaskCreatedEvent;
+import com.springqprobackend.springqpro.domain.event.TaskCreatedEvent;
 import com.springqprobackend.springqpro.service.QueueService;
-import com.springqprobackend.springqpro.service.TaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;

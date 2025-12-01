@@ -2,7 +2,7 @@ package com.springqprobackend.springqpro.integration;
 
 import com.redis.testcontainers.RedisContainer;
 import com.springqprobackend.springqpro.config.RedisTestConfig;
-import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.redis.TaskRedisRepository;
@@ -14,7 +14,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;

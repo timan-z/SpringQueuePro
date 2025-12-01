@@ -1,4 +1,4 @@
-package com.springqprobackend.springqpro.config;
+package com.springqprobackend.springqpro.domain.exception;
 
 /* TaskProcessingException.java
 --------------------------------------------------------------------------------------------------

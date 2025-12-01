@@ -1,14 +1,14 @@
-package com.springqprobackend.springqpro.graphql;
+package com.springqprobackend.springqpro.controller.rest;
 /* NOTE: This file is primarily included for the purpose of practice, and also I guess "mirror testing."
 This is just a REST Controller that one-to-one mimics the purpose of my GraphQL Controller.
 (That's also why I have -- at least currently -- have it in the /graphql package directory).
 */
 
-import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.service.TaskService;
-import com.springqprobackend.springqpro.graphql.controllerRecords.CreateTaskInput;
-import com.springqprobackend.springqpro.graphql.controllerRecords.UpdateTaskInput;
+import com.springqprobackend.springqpro.controller.controllerRecords.CreateTaskInput;
+import com.springqprobackend.springqpro.controller.controllerRecords.UpdateTaskInput;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

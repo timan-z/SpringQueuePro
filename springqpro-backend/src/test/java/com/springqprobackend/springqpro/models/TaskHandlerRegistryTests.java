@@ -4,11 +4,9 @@ package com.springqprobackend.springqpro.models;
 implement the interface are injected. That means that no mocks are needed here (other than maybe
 mocking the handlers themselves). */
 
-import com.springqprobackend.springqpro.interfaces.TaskHandler;
+import com.springqprobackend.springqpro.handlers.TaskHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
 import java.util.Map;

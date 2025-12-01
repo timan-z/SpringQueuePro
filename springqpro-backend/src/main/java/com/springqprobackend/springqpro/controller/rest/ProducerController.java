@@ -1,6 +1,6 @@
-package com.springqprobackend.springqpro.controller;
+package com.springqprobackend.springqpro.controller.rest;
 
-import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.service.QueueService;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.enums.TaskStatus;
@@ -16,10 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.List;
-import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 /* ProducerController.java (DEPRECATED)

@@ -1,4 +1,4 @@
-package com.springqprobackend.springqpro.domain;
+package com.springqprobackend.springqpro.domain.entity;
 
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;

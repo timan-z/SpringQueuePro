@@ -1,3 +1,3 @@
-package com.springqprobackend.springqpro.security;
+package com.springqprobackend.springqpro.security.dto;
 
 public record AuthRequest(String username, String password) { }

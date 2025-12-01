@@ -1,15 +1,14 @@
-package com.springqprobackend.springqpro.graphql;
+package com.springqprobackend.springqpro.controller.graphql;
 
-import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.service.ProcessingService;
 import com.springqprobackend.springqpro.service.TaskService;
-import com.springqprobackend.springqpro.graphql.controllerRecords.CreateTaskInput;
-import com.springqprobackend.springqpro.graphql.controllerRecords.UpdateTaskInput;
+import com.springqprobackend.springqpro.controller.controllerRecords.CreateTaskInput;
+import com.springqprobackend.springqpro.controller.controllerRecords.UpdateTaskInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -19,7 +18,6 @@ import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 /* TaskGraphQLController.java
 --------------------------------------------------------------------------------------------------

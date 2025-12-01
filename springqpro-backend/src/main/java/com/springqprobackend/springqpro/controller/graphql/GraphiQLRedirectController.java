@@ -1,4 +1,4 @@
-package com.springqprobackend.springqpro.graphql;
+package com.springqprobackend.springqpro.controller.graphql;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;

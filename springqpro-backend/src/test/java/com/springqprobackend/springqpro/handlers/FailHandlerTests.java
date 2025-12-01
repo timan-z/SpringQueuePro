@@ -12,18 +12,15 @@ logic where I need to adjust how the handler is invoked).
 */
 
 import com.springqprobackend.springqpro.config.TaskHandlerProperties;
-import com.springqprobackend.springqpro.enums.TaskStatus;
-import com.springqprobackend.springqpro.interfaces.Sleeper;
+import com.springqprobackend.springqpro.util.Sleeper;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.service.QueueService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;

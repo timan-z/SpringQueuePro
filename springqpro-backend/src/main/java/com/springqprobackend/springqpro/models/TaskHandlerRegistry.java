@@ -1,6 +1,6 @@
 package com.springqprobackend.springqpro.models;
 
-import com.springqprobackend.springqpro.interfaces.TaskHandler;
+import com.springqprobackend.springqpro.handlers.TaskHandler;
 import org.springframework.stereotype.Component;
 import java.util.Map;
 

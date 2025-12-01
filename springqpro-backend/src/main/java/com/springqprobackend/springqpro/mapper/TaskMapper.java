@@ -1,6 +1,6 @@
 package com.springqprobackend.springqpro.mapper;
 
-import com.springqprobackend.springqpro.domain.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.models.Task;
 import org.springframework.stereotype.Component;
 

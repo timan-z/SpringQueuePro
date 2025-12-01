@@ -1,8 +1,9 @@
-package com.springqprobackend.springqpro.graphql;
+package com.springqprobackend.springqpro.controller;
 
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 
+// NOTE: I actually don't know if this is deprecated or not or if it's used in TaskRedisController.java...
 /* controllerRecords.java
 --------------------------------------------------------------------------------------------------
 [HISTORY]:

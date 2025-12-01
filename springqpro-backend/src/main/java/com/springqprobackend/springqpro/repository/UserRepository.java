@@ -1,6 +1,6 @@
 package com.springqprobackend.springqpro.repository;
 
-import com.springqprobackend.springqpro.domain.UserEntity;
+import com.springqprobackend.springqpro.domain.entity.UserEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /* UserRepository.java

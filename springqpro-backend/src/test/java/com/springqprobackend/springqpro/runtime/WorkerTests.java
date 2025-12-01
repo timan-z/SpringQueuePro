@@ -2,7 +2,7 @@ package com.springqprobackend.springqpro.runtime;
 
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
-import com.springqprobackend.springqpro.interfaces.TaskHandler;
+import com.springqprobackend.springqpro.handlers.TaskHandler;
 import com.springqprobackend.springqpro.models.Task;
 import com.springqprobackend.springqpro.models.TaskHandlerRegistry;
 import org.junit.jupiter.api.BeforeEach;
