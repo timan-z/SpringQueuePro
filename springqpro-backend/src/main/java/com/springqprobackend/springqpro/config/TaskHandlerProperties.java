@@ -3,6 +3,32 @@ package com.springqprobackend.springqpro.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+/* TaskHandlerProperties.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+Early handlers hardcoded sleep times directly inside the Java classes. As more
+task types were added (EMAIL, FAIL, TAKESLONG, etc.), these constants had to be
+externalized, configurable, and manageable.
+
+This @ConfigurationProperties class was introduced to load handler timing values
+from application.yml.
+
+[CURRENT ROLE]:
+Provides per-handler configurable values such as:
+  - simulated processing time
+  - fail-retry timing
+  - long-running task timing
+
+These properties improve realism and make load testing more consistent.
+
+[FUTURE WORK]:
+CloudQueue may:
+  - load these values dynamically from Redis
+  - expose them in an admin panel
+  - adjust them adaptively under load
+--------------------------------------------------------------------------------------------------
+*/
+
 @ConfigurationProperties(prefix="t-handler")
 @Component
 public class TaskHandlerProperties {

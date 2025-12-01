@@ -6,6 +6,20 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
+/* TaskMapper.java
+--------------------------------------------------------------------------------------------------
+This file is responsible for converting between TaskEntity (DataBase persistent representation)
+and Task (in-memory domain object that the Handlers consume and process). It's this file that
+helps enforce domain consistency (Handlers operate strictly on domain objects, never on persistence-layer
+entities). I originally just did the conversation in method with new Task object creation, but this logic
+needed to be duplicated as ProcessingService came into the picture, so modularity was necessary.
+
+[FUTURE WORK]:
+CloudQueue might introduce additional DTOs for remote workers and built-in serialization for distributed execution.
+--------------------------------------------------------------------------------------------------
+*/
+
+// 2025-11-30-NOTE: Preserving the comment below for now...
 /* 2025-11-15-DEBUG:+NOTE(S)-TO-SELF:
 This file is primarily to avoid doing TaskEntity -> Task conversion and so on within ProcessingService.java (decoupling purposes).
 Remember, Handlers should be operating on Domain objects (Task) and not Persistence objects (TaskEntity).

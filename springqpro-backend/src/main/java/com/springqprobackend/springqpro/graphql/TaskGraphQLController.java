@@ -21,6 +21,39 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+/* TaskGraphQLController.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+GraphQL was introduced as the “modern API surface” for SpringQueuePro. REST worked fine during
+the prototype phase, but GraphQL gave us:
+  - typed schemas
+  - explicit input types
+  - streamlined task queries
+  - future subscription support
+This controller is where that GraphQL schema becomes executable. (Honestly, I've really just
+wanted a reason to use GraphQL and get some experience working with it since it was a requirement
+for a job position I was interviewed for but ultimately bombed).
+
+[CURRENT ROLE]:
+Implements GraphQL Query + Mutation resolvers for:
+  - task(id)
+  - tasks(status)
+  - createTask(input)
+  - updateTask(input)
+  - deleteTask(id)
+All operations flow through TaskService -> QueueService/ProcessingService -> PostgreSQL.
+
+AUTH:
+Each resolver enforces JWT authentication before performing any operation.
+
+[FUTURE WORK]:
+CloudQueue could add:
+   • subscriptions for real-time task progress
+   • federated schemas
+   • dedicated analytics schema for metrics
+--------------------------------------------------------------------------------------------------
+*/
+
 /* NOTE(S)-TO-SELF:
 - @QueryMapping is the GraphQL query resolver (to read operations / basically retrieve stuff, from what I understand).
 - @MutationMapping is the GraphQL mutation resolver (to write operations / to modify data basically).

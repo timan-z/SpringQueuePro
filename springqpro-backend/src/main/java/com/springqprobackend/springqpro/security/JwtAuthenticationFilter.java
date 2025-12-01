@@ -21,6 +21,19 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+/* JwtAuthenticationFilter.java
+--------------------------------------------------------------------------------------------------
+This file extracts JWT access tokens from Authorization headers, validates them using JwtUtil,
+loads user details, and sets the Authentication into the SecurityContext. It's basically the
+core security filter enabling stateless authentication for my GraphQL endpoints (and its REST
+parallel that I have too mostly for my own reference).
+
+[HISTORY]:
+- Originally started with token parsing alone. But grew with CustomUserDetailsService integration
+and now there's full expiration/validation and refresh token constraints.
+--------------------------------------------------------------------------------------------------
+*/
+
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);

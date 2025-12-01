@@ -14,6 +14,35 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/* SecurityConfig.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+Originally, the project had no security at all. Endpoints were completely open.
+Once the system became stateful (PostgreSQL, Redis), authentication and proper
+authorization became mandatory.
+SecurityConfig now serves as the top-level Spring Security configuration.
+
+[CURRENT ROLE]:
+Configures:
+  - stateless JWT authentication
+  - JwtAuthenticationFilter chain
+  - route protection for REST + GraphQL
+  - CSRF disabling (since the system is token-based)
+  - session policy (STATELESS)
+
+Also integrates seamlessly with:
+  - AuthenticationController
+  - CustomUserDetailsService
+  - GraphQL security checks
+
+[FUTURE WORK]:
+CloudQueue may adopt:
+  - CORS tightening
+  - role-based access control
+  - AWS Cognito JWT verification
+--------------------------------------------------------------------------------------------------
+*/
+
 @EnableWebSecurity
 @EnableMethodSecurity
 @Configuration

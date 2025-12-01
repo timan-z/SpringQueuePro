@@ -8,6 +8,15 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+/* CustomUserDetailsService.java
+--------------------------------------------------------------------------------------------------
+This is the file that bridges UserEntity with Spring Security's UserDetails system to support
+authentication, authorization filters, and JWT validation. Its role in the SpringQueuePro system
+is to basically look up users in the PostgreSQL storage and adapt them into Spring Security's model.
+- Before its addition, in the initial stages of the JWT phase, all login logic was in the controllers.
+--------------------------------------------------------------------------------------------------
+*/
+
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepo;

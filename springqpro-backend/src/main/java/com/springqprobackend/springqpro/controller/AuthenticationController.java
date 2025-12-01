@@ -20,10 +20,33 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-
 import java.util.Map;
 
-// 2025-11-24-NOTE(S):+DEBUG: This is the Controller file for registering and making an account.
+/* AuthenticationController.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+Authentication started extremely simple — just a login endpoint returning a raw JWT.
+As security needs grew (Redis-backed refresh tokens, logout, token rotation), the
+controller expanded into a full mini-authentication module.
+
+[CURRENT ROLE]:
+Implements:
+  - /auth/register
+  - /auth/login
+  - /auth/refresh (with rotation)
+  - /auth/logout (server-side token invalidation)
+Backed by:
+  - UserEntity + UserRepository (Postgres)
+  -  JwtUtil (token creation/validation)
+  - RedisTokenStore (refresh-token persistence)
+  - RefreshTokenService (rotation + validation rules)
+[FUTURE WORK]:
+CloudQueue may replace this entire controller with:
+  - AWS Cognito
+  - OAuth2 identity provider
+  - Federated JWTs for multi-region clusters
+--------------------------------------------------------------------------------------------------
+*/
 
 @RestController
 @RequestMapping("/auth")

@@ -7,6 +7,31 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
+/* ExecutorConfig.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+Early prototypes created thread pools directly inside QueueService. As more
+parallelism was added (ProcessingService, retry scheduling, GraphQL execution),
+the need for controlled, centralized executor configuration became clear.
+ExecutorConfig externalized thread pool creation and tuning.
+
+[CURRENT ROLE]:
+Provides:
+  - primary ExecutorService (fixed thread pool)
+  - ScheduledExecutorService for retry/backoff scheduling
+Used by:
+  - QueueService (submit tasks)
+  - ProcessingService (delayed retries)
+
+[FUTURE WORK]:
+CloudQueue may adopt:
+  - managed executors
+  - Quartz scheduling
+  - asynchronous dispatcher microservices
+--------------------------------------------------------------------------------------------------
+*/
+
+// 2025-11-30-NOTE: Ignore the two comment blocks below.
 /* NOTE-TO-SELF: Now that I'm wiring in ExecutorService and ScheduledExecutorService, there are definitely
 adjustments that I need to make to my existing Unit Tests that I'll need to make before writing Integration Tests! (DEBUG: REMEMBER).
 */

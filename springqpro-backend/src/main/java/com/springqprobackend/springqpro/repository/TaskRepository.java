@@ -13,7 +13,21 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
-/* NOTES-TO-SELF:
+/* TaskRepository.java
+--------------------------------------------------------------------------------------------------
+This is the JPA (Java Persistence API) repository for TaskEntity.
+- Since it extends JpaRepository, it'll have all the basic CRUD operations for manipulating tasks,
+but I've also got custom methods for Atomic state transition (extra locking defense in addition to
+Redis optimistic locking) and, in addition, querying by status.
+- This file is essentially the persistence backbone of the Task Orchestration System (very important).
+
+[HISTORY]:
+This file was added once the system shifted away from a fully in-memory queue to persistence-based.
+--------------------------------------------------------------------------------------------------
+*/
+
+/*
+NOTES-TO-SELF:
 - Spring Data JPA can automatically create repositories (DAOs - Data Access Objects) from interfaces.
 - By extending JpaRepository<TaskEntity, String>, you instantly get CRUD methods like:
 -- findAll()
@@ -21,9 +35,7 @@ import java.util.Optional;
 -- save(TaskEntity entity)
 -- deleteById(String id)
 You can also define query methods using naming conventions.
-*/
-
-/*
+--------------------------------------------------------------------------------------------------------------
 NOTE(s)-TO-SELF - [PART TWO - 2025-11-13 EDITS]:
 - The @Modifying annotation in Spring Data JPA is for indicating a repository method (annotated with @Query)
 performs a data modification (CRUD) operation.
@@ -39,7 +51,7 @@ public interface TaskRepository extends JpaRepository<TaskEntity, String> {
     /* Expanding on "You can also define query methods using naming conventions."
     Below is an example of that. W/ these, you never write SQL manually for simple queries.
     -- Method names like findByStatus are descriptive enough to be parsed by Spring to generate queries.
-    -- Spring would read the line below as "SLEECT * FROM tasks WHERE status = ?" (REMEMBER THIS!)
+    -- Spring would read the line below as "SELECT * FROM tasks WHERE status = ?" (REMEMBER THIS!)
     */
     List<TaskEntity> findByStatus(TaskStatus status);
     List<TaskEntity> findByType(TaskType type); // <-- 2025-11-19-DEBUG: I don't know why I'm only adding this now.

@@ -2,6 +2,29 @@ package com.springqprobackend.springqpro.interfaces;
 
 import com.springqprobackend.springqpro.models.Task;
 
+/* TaskHandler.java
+--------------------------------------------------------------------------------------------------
+This is the Interface implemented by all of my Task Handlers, all of which need to define and flesh
+out the following operation: "void handle(Task task) throws Exception".
+
+[HISTORY]
+During the prototype "base-level" SpringQueue project, there was no interface and every Handler was a
+tightly coupled individual file that would change Task status (e.g., QUEUED -> INPROGRESS -> COMPLETED)
+themselves and invoke retry() themselves if necessary. This was changed to use an interface for modularity
+and to decouple functionality (the actual handlers are quite primitive, it's designed to be reworked).
+
+At this point, they're more like simulate worktime vessels as ProcessingService handles all persistence updates,
+retries, metrics, and state transitions.
+
+[SPECIAL NOTE]:
+The FAIL handler family simulates intentional failure/retry scenarios.
+
+[FUTURE WORK]:
+- In CloudQueue, all the handlers will probably be replaced by microservices or remote workers.
+--------------------------------------------------------------------------------------------------
+*/
+
+// 2025-11-30-NOTE: Save this large comment block below for my overall README.md (and probably my detailed "phases" section too).
 /* NOTE: Remember that my end goal for this whole SpringQueue(->SpringQueuePro->CloudQueue) project is for it
 to eventually be deployed on the cloud.
 
@@ -20,10 +43,8 @@ More benefits of this choice:
 - O(1) extension (better than switch/case efficiency wise).
 - Independent testing of each task handler.
 - Cleaner separation of concerns! (This is important).
-
 See comment block in TaskHandlerRegistry.java.
 */
-
 public interface TaskHandler {
     void handle(Task task) throws InterruptedException;
 }

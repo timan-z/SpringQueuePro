@@ -5,8 +5,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
-
 import java.util.concurrent.TimeUnit;
+
+/* RedisTokenStore.java
+--------------------------------------------------------------------------------------------------
+This file stores and checks refresh tokens in Redis to enable server-side token revocation, token
+rotation, and immediate logout with revocation of tokens. It's this file that ensures refresh
+tokens can be invalidated immediately. (Originally refresh tokens were not stored server-side
+but now Redis provides stateful control of them).
+
+[FUTURE WORK]:
+- Could integrate expiration events for auto-cleanup or Redisson buckets.
+--------------------------------------------------------------------------------------------------
+*/
 
 @Component
 public class RedisTokenStore {

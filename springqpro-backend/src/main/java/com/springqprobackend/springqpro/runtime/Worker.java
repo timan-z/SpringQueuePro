@@ -6,28 +6,38 @@ import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.interfaces.TaskHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-/* 2025-11-14-DEBUG:+REMINDER -- CHANGES TO Worker.java:
-POST ProcessingService.java ARCHITECTURAL REFACTORING, MY QueueService Worker Threads STILL EXIST,
-BUT THEY'VE BEEN DEMOTED FROM BEING OWNERS OF BUSINESS LOGIC TO JUST RUNNERS OF UNITS OF WORK!
-QueueService is now using: "
-public void enqueueById(String taskId) {
-    executor.submit(() -> processingService.claimAndProcess(taskId));
-}"
-So what the Worker Threads do now is this:
-- They pull the latest persisted state from the DataBase.
--- ProcessingService.java executes the corresponding handler.
--- It saves the result back to the DataBase.
-Meaning that my Worker Threads are now execution vessels, no longer "decision makers."
-They don’t manipulate retries or requeue directly — they just invoke the logic defined by ProcessingService.
-- So, yeah, I definitely need to adjust a lot here.
+
+/* Worker.java (DEPRECATED)
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+This is the file that defined the Prototype Thread Worker that would be submitted by the ExecutorService
+inside QueueService.java. These Worker Threads were what initially processed enqueued Tasks (after popping
+them off of QueueService), executing handlers directly. (In the initial stages of my project, QueueService
+was the "source of truth", maintaining an in-memory Task map with the Worker-based pipeline via ExecutorService).
+- NOTE: See "SpringQueue" (Base) for the original Worker Thread in action (which built off of GoQueue).
+
+After the integration of ProcessingService.java, where database persistence was introduced, the Worker Thread
+was demoted from being owners of business logic to just being "runners of units of work" that would pull
+the latest persisted state from DataBase, "be acknowledged" and then ProcessingService would execute the
+appropriate handler and save the result back to the DataBase. (They no longer manipulated retries or
+re-enqueued failed tasks directly, basically just became vessels for invoking logic defined by ProcessingService).
+
+As Redis was introduced (and further development of ProcessingService with optimistic locking, Redis locks, and so on),
+eventually the purpose of the Worker Thread was phased out in conjunction with QueueService now having little more
+purpose than being a wrapper for an ExecutorService that would submit Task IDs (first saved to the DataBase and later pulled
+out and cached) for ProcessingService to process.
+
+NOTE: There still technically are "worker threads" but they aren't defined in this way anymore (they lack
+any real business logic and are just the default threads of QueueService's ExecutorService).
+--------------------------------------------------------------------------------------------------
+Kept as historical artifact for reference.
 */
+
+@Deprecated
 public class Worker implements Runnable {
     // Fields:
     private static final Logger logger = LoggerFactory.getLogger(Worker.class);
     private final Task task;
-    /* NOTE-TO-SELF: Remember, Java is pass-by-value BUT for objects that value is the reference itself.
-    "queue" will point to the same Queue instantiated elsewhere (references point to the same location in the memory heap). */
-
     private final TaskHandlerRegistry handlerRegistry;
 
     // Constructor:

@@ -5,6 +5,18 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
 
+/* RefreshTokenService.java
+--------------------------------------------------------------------------------------------------
+This file orchestrates Refresh Token rotation, storage, and validation. It also delegates
+persistence to RedisTokenStore.java. This file ensures secure, OAuth2-style refresh
+behavior with single-use refresh tokens, rotation on every login/refresh, and revocation
+via user logout. (This feature was added as part of the JWT RBAC phase).
+
+[FUTURE WORK]:
+- Could integrate session metadata, device tracking, or audit logging. Who knows.
+--------------------------------------------------------------------------------------------------
+*/
+
 @Service
 public class RefreshTokenService {
     // Field(s):

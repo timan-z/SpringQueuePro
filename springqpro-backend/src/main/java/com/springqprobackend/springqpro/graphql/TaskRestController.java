@@ -14,6 +14,28 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/* TaskRestController.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+This controller was created as a REST mirror of the GraphQL controller for debugging,
+educational purposes, and Postman-based testing. While GraphQL is the “official” API,
+REST endpoints remain extremely useful when verifying behavior with simple clients.
+
+[CURRENT ROLE]:
+Provides REST-style CRUD endpoints for persisted Tasks. Mainly used for:
+  - debugging
+  - regression testing
+  - side-by-side comparison with GraphQL
+  - my own learning tbh
+Production usage will happen through GraphQL.
+
+[FUTURE WORK]:
+In CloudQueue, REST may be removed or replaced with:
+   • gateway-exposed read endpoints
+   • admin-only REST management routes
+--------------------------------------------------------------------------------------------------
+*/
+
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskRestController {

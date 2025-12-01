@@ -24,6 +24,43 @@ import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/* ProcessingService.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+This class represents the architectural turning point of SpringQueuePro.
+
+Originally, Task processing was done entirely inside QueueService using in-memory Worker threads.
+Handlers were responsible for mutating Task state and even manually scheduling retries. None of
+this behavior was persisted, distributed, or concurrency-safe beyond a single instance.
+
+As the system evolved (PostgreSQL persistence -> Redis locks -> retry policy unification), the
+processing logic needed to be centralized, durable, and consistent. ProcessingService was created
+to replace Worker threads entirely and become the “single source of truth” for task execution.
+
+[CURRENT ROLE]:
+This class now performs the entire persisted lifecycle of a Task:
+ - Atomically claim a TaskEntity via DB transition (QUEUED → INPROGRESS)
+ - Convert TaskEntity → Task (domain object) using TaskMapper
+ - Invoke the appropriate TaskHandler
+ - Persist COMPLETED or FAILED back to PostgreSQL
+ - Schedule retries using exponential backoff
+ - Emit metrics for observability
+ - Enforce Redis-backed distributed lock safety
+
+[NOTES]:
+All retry logic, failure handling, status transitions, and attempts incrementing happen here now.
+Handlers simply express success or failure via normal return or thrown exception.
+
+[FUTURE WORK]:
+ProcessingService is the part of SpringQueuePro that most cleanly maps onto CloudQueue. In the
+future, it may be replaced by:
+ - External worker microservices
+ - AWS SQS + Lambda consumers
+ - ECS tasks running distributed handler workloads
+--------------------------------------------------------------------------------------------------
+*/
+
+// 2025-11-30-NOTE: The comment below should be preserved for later documentation:
 /* NOTE-TO-SELF: - [2025-11-13 EDIT]:
 This is a new @Service file that will contain the transactional, DB-focused logic for
 claiming and persisting a task's lifecycle. It'll be called from a QueueService worker thread
@@ -78,7 +115,6 @@ Worker threads now simply execute processing calls safely and concurrently, read
 This is a textbook event-driven architecture with persistence-backed coordination.
 THAT'S WHAT YOU FIND IN PROFESSIONAL-GRADE ARCHITECTURE MODELS LIKE Spring Batch, Celery, Sidekiq, and so on.
 */
-
 @Service
 public class ProcessingService {
     // Field(s):

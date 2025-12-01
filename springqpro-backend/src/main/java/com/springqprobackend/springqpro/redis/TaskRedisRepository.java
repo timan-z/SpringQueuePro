@@ -8,17 +8,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
-
 import java.time.Duration;
 
-// A thin cache abstraction. Keep logic here so you can change eviction/format later.
-// Note: We cache TaskEntity (DB representation) rather than domain Task. This fits DDD: cache the authoritative persisted shape.
+/* TaskRedisRepository.java
+--------------------------------------------------------------------------------------------------
+This file is my Redis repository. Of course, it's basically a Redis-based caching layer for TaskEntity
+objects used to accelerate the retrieval of recently processed tasks and offloading read-heavy queries.
+It's not really part of the core processing pipeline and more of an overall system performance enhancer.
+(Caching TaskEntity, the DataBase representation of our Tasks, rather than the domain in-memory Task is
+appropriate too fitting DDD: "cache the authoritative persisted shape").
 
-/* 2025-11-21-REDIS-PHASE-NOTE:
-- This file is a thin cache abstraction.
-- We'll be caching TaskEntity (DB representation, not domain Task). This is good DDD (Domain-Driven Design): Cache the authoritative persisted shape.
+[FUTURE WORK]:
+- Redis Streams for Task Event logs in preparation for CloudQueue, probably.
 */
-// NOTE:+DEBUG: During refactoring, I should clean things up and probably add this file to package repository instead of this "redis" package. (Avoided for now to keep integration simple).
+
 @Repository
 public class TaskRedisRepository {
     // Field(s):

@@ -22,6 +22,28 @@ import java.util.List;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
+/* ProducerController.java (DEPRECATED)
+--------------------------------------------------------------------------------------------------
+[HISTORY]
+This was the original REST API for enqueuing and inspecting in-memory Tasks during the early SpringQueue
+prototype phase. This was used when the queue was fully in-memory and supported these endpoints:
+- /api/enqueue
+- /api/jobs
+- /api/jobs/:id
+- /api/jobs/:id/retry
+
+As the architecture evolved into SpringQueuePro, the Queue was no longer fully in memory and the system
+became more and more decoupled (e.g., persistence moving to PostgreSQL, distributed locking moving to Redis,
+and retry logic moving to ProcessingService), this controller became obsolete. Additionally, it was important
+for me to integrate GraphQL into this project so it always my intention to move away from a REST-styled API.
+- All production logic has essentially moved to TaskGraphQLController and TaskService / ProcessingService.
+--------------------------------------------------------------------------------------------------
+Kept as a historical artifact and also for legacy compatibility.
+- NOTE: Comments frequently reference GoQueue (recall that SpringQueue began as a logical translation
+of GoQueue into Java/SpringBoot and then advanced to become more "idiomatically Java").
+*/
+
+@Deprecated
 @RestController
 @RequestMapping("/api")
 //@CrossOrigin(origins = "${CORS_ALLOWED_ORIGIN}") // for Netlify/Railway CORS (also local dev) <-- this line alone should replace the CORS stuff I had in Producer.go

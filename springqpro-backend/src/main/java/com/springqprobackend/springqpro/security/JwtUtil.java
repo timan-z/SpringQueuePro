@@ -11,6 +11,21 @@ import java.security.Key;
 import java.util.Date;
 import java.util.UUID;
 
+/* JwtUtil.java
+--------------------------------------------------------------------------------------------------
+This file generates, validates, and parses JWT Access/Refresh tokens. It supports:
+- HS256 Signing
+- Access Token Expiry Enforcement
+- Refresh Token Rotation Checks
+It's basically the cryptographic backbone of the SpringQueueProSystem.
+Originally, the only method in here was a generateToken(email) method, but it's since evolved
+into a complete JWT lifecycle manager.
+
+[FUTURE WORK]:
+- CloudQueue (AWS Deployment Version) might switch to RSA/ECDSA asymmetric keys and JWKS endpoints.
+--------------------------------------------------------------------------------------------------
+*/
+
 @Component
 public class JwtUtil {
     // Field(s):

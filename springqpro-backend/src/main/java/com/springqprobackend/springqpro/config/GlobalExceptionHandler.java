@@ -16,6 +16,31 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
+/* GlobalExceptionHandler.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+As the project grew (JWT, GraphQL, REST, Redis, PostgreSQL), exceptions became
+more varied and harder to track. This global handler was introduced to unify
+error output and provide consistent JSON responses.
+
+[CURRENT ROLE]:
+Handles:
+  - validation failures
+  - missing tokens
+  - invalid credentials
+  - parsing errors
+  - unexpected exceptions
+Ensures clients receive predictable HTTP responses instead of raw stack traces.
+
+[FUTURE WORK]:
+CloudQueue may expand this into:
+  - structured error codes
+  - correlation IDs for distributed tracing
+  - Sentry / CloudWatch integration
+--------------------------------------------------------------------------------------------------
+*/
+
+// 2025-11-30-NOTE: Preserve the two comment blocks below for future documentation.
 /* 2025-11-25-NOTE(S):
 - EXPANDING THIS TO HANDLE INVALID CREDENTIALS AND JWT-RELATED ERRORS ENCOUNTERED IN AuthenticationController.java
 - OVERHAULING EXISTING METHODS TO MAKE RESPONSES MORE BROAD AND GENERAL AND NOT SO SPECIFIC LIKE THEY ORIGINALLY WERE TO THE EARLIER PHASES OF THIS PROJECT.

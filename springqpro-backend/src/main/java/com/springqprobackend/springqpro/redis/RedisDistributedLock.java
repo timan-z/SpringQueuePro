@@ -11,6 +11,25 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.UUID;
 
+/* RedisDistributedLock.java
+--------------------------------------------------------------------------------------------------
+This file implements a lightweight Redis-based distributed lock using the Redis command:
+"SET key value NX PX ttl". So, this is used in ProcessingService.java, particularly its claimAndProcess()
+method that deals with enqueued Tasks. That file originally relied on, still present, Atomic state transition
+methods as a way to "lock" down threads using ProcessService to process Tasks and prevent double-processing.
+With the integration of Redis, this more secure Redis Distributed Locks are like an extra layer of
+security making sure that only one worker thread can process a task at a time.
+- Also has method with a Lua script inside that checks token.
+
+Supposedly, the in-memory locking would fail in multi-instance environments and so Redis optimistic locks
+compensate for that shortcoming. (I don't know how to test this).
+
+[FUTURE WORK]: For CloudQueue, these features amy be added:
+- Redisson locks.
+- DynamoDB TTL-based locks.
+- SQS visibility timeouts.
+*/
+
 /* 2025-11-21-REDIS-PHASE-NOTE:
 - Safe lock using SET key value NX PX ms and a Lua script unlock that checks token (prevents deleting another holder’s lock).
 - How to use: String token = lock.tryLock("task:lock:"+id, 10000); if(token!=null){ try { ... } finally { lock.unlock(...); } }

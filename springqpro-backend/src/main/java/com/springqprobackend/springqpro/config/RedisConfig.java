@@ -17,6 +17,32 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+/* RedisConfig.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+Redis integration began when the system needed:
+  - refresh token storage for JWT
+  - distributed locking for multi-instance safety
+  - high-performance caching for task reads
+RedisConfig is where the Redis connection factory and templates are created.
+
+[CURRENT ROLE]:
+Defines:
+  - LettuceConnectionFactory
+  - RedisTemplate<String, Object>
+  - StringRedisTemplate
+These beans are used for:
+  - RedisTokenStore
+  - RedisDistributedLock
+  - TaskRedisRepository
+[FUTURE WORK]:
+CloudQueue may:
+  - adopt RedissonClient
+  - use Redis Cluster mode
+  - enable connection pooling and pipelining
+--------------------------------------------------------------------------------------------------
+*/
+
 // 2025-11-21-REDIS-PHASE-NOTE: THIS FILE CREATES CONNECTION FACTORY AND REDIS TEMPLATE W/ JACKSON SERIALIZER:
 @Profile("!test")
 @Configuration

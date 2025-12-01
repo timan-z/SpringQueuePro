@@ -6,6 +6,35 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
+/* TaskEntity.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+Originally the system used only the in-memory Task model, held inside QueueService. As the
+architecture evolved into something durable and distributed, we needed a persistent record of
+Tasks. That’s how TaskEntity was born — the canonical database-backed form.
+
+It gained fields like attempts, maxRetries, createdAt, and @Version to support optimistic locking.
+Eventually it became the authoritative representation used by ProcessingService.
+
+[CURRENT ROLE]:
+TaskEntity is the storage-level representation of a queued job. It is used for:
+   • Durable task state in PostgreSQL
+   • Optimistic locking (via @Version)
+   • Claims and transitions (QUEUED → INPROGRESS → COMPLETED/FAILED)
+   • Integration with Redis locks
+   • Dashboard + GraphQL queries
+
+This is now the backbone object of the queue system.
+
+[FUTURE WORK]:
+CloudQueue may extend this entity to support:
+   • priority queues
+   • scheduled tasks (delayUntil timestamps)
+   • multi-tenant sharding (tenantId, region)
+--------------------------------------------------------------------------------------------------
+*/
+
+// 2025-11-30-NOTE: Need to preserve the two comment blocks below for eventual documentation.
 /* NOTE(S)-TO-SELF:
 - @Entity marks this class for persistence (Hibernate will map it to a DataBase table). Each field corresponds to a column.
 - ^ will assume same table name, but you can specify with @Table(name="tasks") <-- good practice for table names is all lowercase.
@@ -18,7 +47,6 @@ Spring Boot w/ Spring Data JPA, through Hibernate, automatically generates the S
 Also, this file isn't meant to re-place Task.java (which stands as the runtime / in-memory representation of a Task).
 This TaskEntity file here is the persistence representation (database-backed model for durable storage).
 */
-
 /* NOTE(S)-TO-SELF - [PART TWO - 2025-11-13 EDITS]:
 - The @Version annotation is a JPA annotation for "optimistic locking" -- a mechanism to prevent concurrent modifications
 to the same entity in a database (this is for data integrity in multi-user environments).
@@ -48,7 +76,6 @@ Persistence race conditions can still happen in the event of:
 
 Handling this with @Version etc is the way that real Job Queue systems like SideKiq, Celery, and so on do it -- so I will too!!!
 */
-
 @Entity
 @Table(name="tasks")
 public class TaskEntity {

@@ -5,6 +5,34 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/* UserEntity.java
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+UserEntity was added once SpringQueuePro matured past the prototype stage and required actual
+authentication boundaries. Initially, the system had no concept of users; all endpoints were
+open and unauthenticated.
+
+When JWT-based security was introduced, a persistent representation of a user (email + hashed
+password) was needed. This JPA entity serves as the storage model for authentication.
+
+[CURRENT ROLE]:
+Simple PostgreSQL-backed entity containing:
+  - email (Primary Key)
+  - passwordHash
+
+Used by CustomUserDetailsService and AuthenticationController for:
+  - login
+  - registration
+  - refresh token workflow
+  - token validation
+
+[FUTURE WORK]:
+In CloudQueue, this may grow fields such as:
+  - roles / RBAC permissions
+  - created timestamps
+  - integration with AWS Cognito / OAuth providers
+--------------------------------------------------------------------------------------------------
+*/
 /* 2025-11-24-NOTE(S):+DEBUG: JWT INTEGRATION PHASE!!!
 Of course, this will be the Model representation for like a "User Account" I guess. (Still not 100% sure how I want to go about this).
 */

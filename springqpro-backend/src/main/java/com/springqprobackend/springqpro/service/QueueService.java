@@ -21,6 +21,29 @@ import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/* QueueService.java (still relevant, but the bulk of its functionality is deprecated).
+--------------------------------------------------------------------------------------------------
+[HISTORY]:
+This file here is basically the root from which this entire project originated from.
+QueueService was once the heart of SpringQueuePro and basically performed all the system logic
+within this one class; it maintained an in-memory ConcurrentHashMap of Tasks and executed
+handlers itself via Worker threads (see deprecated Worker.java).
+
+As the architecture involved (persistence moved to PostgreSQL, ProcessingService now handled
+the processing logic, distributed locking moved to Redis, and retry logic was moved outside
+the Handler implementations), the bulk of QueueService's functionality became obsolete.
+
+[CURRENT ROLE]:
+Now, QueueService is basically an intermediary between TaskEntity's enqueueById(taskId)
+method and ProcessingService's claimAndProcess() method. The latter marks a DataBase-persisted
+Task for ProcessingService's processing by first submitting it to ExecutorService (where the latter
+is invoked). This makes sure that ProcessingService is the single source of processing truth.
+--------------------------------------------------------------------------------------------------
+I've kept the legacy methods, in-memory maps, and so on as a historical artifact; they are not
+part of the modern production path.
+*/
+
+// 2025-11-30-NOTE: The massive comment blocks below should 100% be preserved for the documentation. Don't remove them yet!
 /* 2025-11-14-DEBUG:+REMINDER: After I finish my ProcessingService-based architectural overhaul of my program,
 don't forget to remove QueueProperties from this file and adjust the second constructor to get rid of it
 (and also adjust the UnitTests for QueueService because that's what the second constructor is for, and I'll need to tweak stuff).
@@ -131,6 +154,7 @@ public class QueueService {
     // Methods:
     // 1. Translating GoQueue's "func (q * Queue) Enqueue(t task.Task) {...}" function:
     // EDIT: THE VERSION OF enqueue BELOW IS NOW LEGACY CODE FROM THE PROTOTYPE PHASE! enqueueById ABOVE WILL BE USED BY ProcessingService.java.
+    @Deprecated
     public void enqueue(Task t) {
         t.setStatus(TaskStatus.QUEUED);
         queueEnqueueCounter.increment();
@@ -145,6 +169,7 @@ public class QueueService {
 
     // 2. Translating GoQueue's "func (q * Queue) Clear() {...}" function:
     // (This is the method for "emptying the queue").
+    @Deprecated
     public void clear() {
         writeLock.lock();
         try {
@@ -156,6 +181,7 @@ public class QueueService {
 
     // 3. Translating GoQueue's "func (q * Queue) GetJobs() []*task.Task {...}" function:
     // This is the method for returning a copy of all the Jobs (Tasks) we have:
+    @Deprecated
     public List<Task> getJobs() {
         readLock.lock();
         try {
@@ -167,6 +193,7 @@ public class QueueService {
 
     // 5. Translating GoQueue's "func (q * Queue) GetJobByID(id String) (*task.Task, bool)" function:
     // This is the method for returning a specific Job (Task) by ID:
+    @Deprecated
     public Task getJobById(String id) {
         /* In my GoQueue version of this function, I returned a bool and the Task, but the reasons for that
         were entirely superfluous and I can just return null like a normal human being if Task isn't found. */
@@ -184,6 +211,7 @@ public class QueueService {
 
     // 6. Translating GoQueue's "func (q * Queue) DeleteJob(id string) bool" function:
     // This is the method for deleting a specific Job (Task) by ID:
+    @Deprecated
     public boolean deleteJob(String id) {
         writeLock.lock();
         boolean res = false;
@@ -202,6 +230,7 @@ public class QueueService {
     // TO-DO: DELETE THE METHOD BELOW WHEN ProcessingService.java-REHAUL IS COMPLETE AND TESTED!
     /*EDIT: LEGACY METHOD THAT WILL NO LONGER BE USED -- RETRY LOGIC WILL NOW LIVE IN ProcessingService.java
     (RETRY SCHEDULING IS PERSISTENCE-DRIVEN NOW, NOT MANUAL LIKE IT WAS WITH QueueService AND THE METHOD BELOW: */
+    @Deprecated
     public void retry(Task t, long delayMs) {
         if(t.getStatus() != TaskStatus.FAILED) {
             logger.info("[QueueService] Retry request for Task {} (non-FAILED Task) rejected!", t.getId());
@@ -211,6 +240,7 @@ public class QueueService {
     }
 
     // HELPER-METHOD(S): Might be helpful for monitoring endpoints if necessary...
+    @Deprecated
     public int getJobMapCount() {
         return jobs.size();
     }
@@ -220,6 +250,7 @@ public class QueueService {
     - This ensures clean terminal (very important when the service is deployed on Railway or whatever).
     */
     // NOTE: It's just hit me - I don't think I shutdown the scheduled executor????
+    // 2025-11-30-NOTE: NOT DEPRECATED!!!
     @PreDestroy
     public void shutdown() {
         logger.info("[Inside @PreDestroy method] Shutting down QueueService...");
