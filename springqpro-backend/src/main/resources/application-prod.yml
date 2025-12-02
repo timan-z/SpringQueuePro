@@ -16,7 +16,7 @@ spring:
     host: ${REDISHOST}
     port: ${REDISPORT}
     password: ${REDISPASSWORD}
-    ssl: true
+    ssl: false  # # internal Railway Redis uses plain TCP.
 
 jwt:
   secret: ${JWT_SECRET}

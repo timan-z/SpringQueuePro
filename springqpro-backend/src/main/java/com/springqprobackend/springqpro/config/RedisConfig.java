@@ -54,17 +54,25 @@ public class RedisConfig {
             @Value("${spring.redis.host}") String host,
             @Value("${spring.redis.port}") int port,
             @Value("${spring.redis.password}") String password,
-            @Value("${spring.redis.ssl}") boolean ssl
+            @Value("${spring.redis.ssl}") boolean ssl   // default to false is missing
     ) {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
         config.setHostName(host);
         config.setPort(port);
-        config.setPassword(RedisPassword.of(password));
-        LettuceClientConfiguration clientConfig =
+        if (password != null && !password.isBlank()) {
+            config.setPassword(RedisPassword.of(password));
+        }
+        LettuceClientConfiguration.LettuceClientConfigurationBuilder builder = LettuceClientConfiguration.builder();
+        if (ssl) {
+            builder.useSsl();
+        }
+        LettuceClientConfiguration clientConfig = builder.build();
+        return new LettuceConnectionFactory(config, clientConfig);
+        /*LettuceClientConfiguration clientConfig =
                 LettuceClientConfiguration.builder()
                         .useSsl()     // NOTE: REQUIRED for Railway Redis
                         .build();
-        return new LettuceConnectionFactory(config, clientConfig);
+        return new LettuceConnectionFactory(config, clientConfig);*/
     }
 
     @Bean
