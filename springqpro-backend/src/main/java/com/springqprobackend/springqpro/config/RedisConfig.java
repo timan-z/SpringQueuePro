@@ -9,7 +9,9 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -50,10 +52,19 @@ public class RedisConfig {
     @Bean
     public LettuceConnectionFactory redisConnectionFactory(
             @Value("${spring.redis.host}") String host,
-            @Value("${spring.redis.port}") int port
+            @Value("${spring.redis.port}") int port,
+            @Value("${spring.redis.password}") String password,
+            @Value("${spring.redis.ssl}") boolean ssl
     ) {
-        RedisStandaloneConfiguration cfg = new RedisStandaloneConfiguration(host, port);
-        return new LettuceConnectionFactory(cfg);
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+        config.setHostName(host);
+        config.setPort(port);
+        config.setPassword(RedisPassword.of(password));
+        LettuceClientConfiguration clientConfig =
+                LettuceClientConfiguration.builder()
+                        .useSsl()     // NOTE: REQUIRED for Railway Redis
+                        .build();
+        return new LettuceConnectionFactory(config, clientConfig);
     }
 
     @Bean

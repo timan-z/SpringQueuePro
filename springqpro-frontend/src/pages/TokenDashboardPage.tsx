@@ -17,6 +17,7 @@ TO-DO: Write a JWT Debugger file that parses JWT Payload locally and displays in
 import { useAuth } from "../utility/auth/AuthContext";
 import { jwtDecode } from "jwt-decode";
 import { useEffect, useState } from "react";
+import NavBar from "../components/NavBar";
 
 export default function TokenDashboardPage() {
     const { accessToken, refreshToken, decoded, refresh, logout } = useAuth();
@@ -36,38 +37,39 @@ export default function TokenDashboardPage() {
 
     return (
         <div style={{ padding: 40, color: "#00FF41", fontFamily: "monospace" }}>
-        <h1>Authentication Dashboard</h1>
-        <p>Logged in as: <b>{decoded?.sub}</b></p>
+            <NavBar />
+            <h1>Authentication Dashboard</h1>
+            <p>Logged in as: <b>{decoded?.sub}</b></p>
 
-        <h2>Access Token</h2>
-        <p>{masked(accessToken)}</p>
-        <p>Expires: {decoded?.exp ? new Date(decoded.exp * 1000).toString() : "N/A"}</p>
+            <h2>Access Token</h2>
+            <p>{masked(accessToken)}</p>
+            <p>Expires: {decoded?.exp ? new Date(decoded.exp * 1000).toString() : "N/A"}</p>
 
-        <h2>Refresh Token</h2>
-        <p>{masked(refreshToken)}</p>
-        <p>Redis status: {redisStatus}</p>
+            <h2>Refresh Token</h2>
+            <p>{masked(refreshToken)}</p>
+            <p>Redis status: {redisStatus}</p>
 
-        <button onClick={refresh} style={{ marginRight: 10 }}>Refresh Access Token</button>
-        <button onClick={logout}>Logout</button>
+            <button onClick={refresh} style={{ marginRight: 10 }}>Refresh Access Token</button>
+            <button onClick={logout}>Logout</button>
 
-        <hr/>
+            <hr/>
 
-        <h3>Test Protected API</h3>
-        <button
-            onClick={async () => {
-            const res = await fetch("/graphql", {
-                method: "POST",
-                headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${accessToken}`,
-                },
-                body: JSON.stringify({ query: "{ tasks { id } }" }),
-            });
-            alert("GraphQL response: " + (await res.text()));
-            }}
-        >
-            Run Test Query
-        </button>
+            <h3>Test Protected API</h3>
+            <button
+                onClick={async () => {
+                const res = await fetch("/graphql", {
+                    method: "POST",
+                    headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${accessToken}`,
+                    },
+                    body: JSON.stringify({ query: "{ tasks { id } }" }),
+                });
+                alert("GraphQL response: " + (await res.text()));
+                }}
+            >
+                Run Test Query
+            </button>
         </div>
     );
 }

@@ -12,10 +12,11 @@ spring:
       hibernate:
         format_sql: false
 
-redis:
-  host: ${REDISHOST}
-  port: ${REDISPORT}
-  password: ${REDISPASSWORD}
+  redis:
+    host: ${REDISHOST}
+    port: ${REDISPORT}
+    password: ${REDISPASSWORD}
+    ssl: true
 
 jwt:
   secret: ${JWT_SECRET}
