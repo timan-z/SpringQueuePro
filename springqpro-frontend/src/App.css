@@ -1,6 +1,7 @@
-.navBar {
+
+/*.navBar {
   width: 100%;
-  background-color: white;
+  background-color: rgb(255, 0, 0);
   font-family: monospace;
   padding: 14px;
   border-bottom: 2px solid black;
@@ -19,7 +20,8 @@
 
 .navBar a:hover {
   text-decoration: underline;
-}
+}*/
+
 /*#root {
   max-width: 1280px;
   margin: 0 auto;

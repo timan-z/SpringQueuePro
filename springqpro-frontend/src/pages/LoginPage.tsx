@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { loginUser } from "../api/api.ts";
 import { useAuth } from "../utility/auth/AuthContext";
 import { useNavigate } from "react-router-dom";
+import NavBar from "../components/NavBar";
 
 export default function LoginPage() {
     const emailRef = useRef<HTMLInputElement>(null);
@@ -24,19 +25,20 @@ export default function LoginPage() {
         }
     };
 
-    // DEBUG:+TO-DO:[BELOW] FLESH THIS OUT LATER!!!
+    /* 2025-12-02-NOTE: To be frank, I'm on a time crunch so I'm just going to be copying
+    my Login Page design from my "Hack MD Clone" CMDE Project and adjusting it slightly aesthetically.
+    TO-DO: Maybe replace this with a more original design later - make a new branch and overhaul the frontend
+    whenever I've got the time to work on my atrocious frontend HTML/CSS skills (make this look nice).
+    */
     return(
-        <div style={{ padding: 40, color: "#00FF41", fontFamily: "monospace" }}>
-            <h2>Login to SpringQueuePro</h2>
-            {error && <div style={{ color: "red" }}>{error}</div>}
+        <div>
+            {/* NOTE: Remove NavBar after I have it looking nice -- it's not supposed to be on the LoginPage!!! */}
+            <NavBar />
 
-            <form onSubmit={handleLogin}>
-                <input ref={emailRef} type="email" placeholder="Email" style={{ margin: 8 }} />
-                <input ref={passRef} type="password" placeholder="Password" style={{ margin: 8 }} />
-                <button type="submit">Login</button>
-            </form>
 
-            <a href="/register" style={{ color: "#00FF41" }}>Create account →</a>
+
+
+
         </div>
     );
 }
