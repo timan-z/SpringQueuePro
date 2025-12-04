@@ -12,6 +12,14 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          
+          
+          {/* 2025-12-03-NOTE:+TO-DO: Once I flesh out the post-LoginPage and RegisterPage, come back her and repeat what I did
+          with the CMDE project where I auto-default the default URL to re-direct to /login or the dashboard
+          depending on the browser has localStorage tokens or whatever it was that I did. */}
+          {/*<Route path="/" element={<Navigate to="/Login" replace/>} />*/}
+
+
           {/* LOGIN PAGE: */}
           <Route path="/login" element={<LoginPage />} />
           {/* REGISTER PAGE: */}
@@ -26,6 +34,7 @@ export default function App() {
 
           {/* Default root redirect: */}
           <Route path="*" element={<LoginPage />}/>
+
         </Routes>
       </AuthProvider>
     </BrowserRouter>

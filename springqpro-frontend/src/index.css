@@ -1,4 +1,18 @@
 
+
+
+
+/* When I'm trying height:"100vh"; on an outermost <div> in a .tsx file, I'm still getting some browser vertical scroll space 
+because the browser's real viewport height is slightly larger than the default margins on <body> or because of scrollbars 
+changing the effective viewport height. The styling below fixes everything. Supposedly dvh instead of vh solves this too 
+because that's dynamic viewport height (measured after scrollbars and user UI, and so on, are taken into account). 
+But using it didn't work for me: */
+html, body {
+  margin:0;
+  padding:0;
+  height:100%;
+}
+
 /* Navigation Bar-related (/src/components/NavBar.tsx): */
 .navBar {
   width:100%;

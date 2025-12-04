@@ -81,7 +81,7 @@ export default function LoginPage() {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            paddingTop: "40px"
+            /*paddingTop: "40px"*/
         }}>
             {/* Outer-most <div> element containing the "Sign in to SoringQueuePro" box. Should be centered in the middle of the screen: */} 
             <div style={{
