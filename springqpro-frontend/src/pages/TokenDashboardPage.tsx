@@ -14,62 +14,251 @@ Have buttons for:
 
 TO-DO: Write a JWT Debugger file that parses JWT Payload locally and displays internal info.
 */
-import { useAuth } from "../utility/auth/AuthContext";
-import { jwtDecode } from "jwt-decode";
+// src/pages/TokenDashboardPage.tsx
+
 import { useEffect, useState } from "react";
+import { useAuth } from "../utility/auth/AuthContext";
+import { refreshAccessToken, getRedisTokenStatus } from "../api/api";
 import NavBar from "../components/NavBar";
 
+interface DecodedJWT {
+  sub: string;
+  iat: number;
+  exp: number;
+  iss?: string;
+  [key: string]: any;
+}
+
 export default function TokenDashboardPage() {
-    const { accessToken, refreshToken, decoded, refresh, logout } = useAuth();
-    const [redisStatus, setRedisStatus] = useState<string>("checking...");
+  const { accessToken, refreshToken, login } = useAuth();
+  const [decoded, setDecoded] = useState<DecodedJWT | null>(null);
+  const [expiryCountdown, setExpiryCountdown] = useState<string>("");
+  const [redisStatus, setRedisStatus] = useState<string>("Checking...");
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
-    // Fetch Redis token store status:
-    useEffect(() => {
-        (async () => {
-            if (!refreshToken) return setRedisStatus("no token");
-            const res = await fetch(`/actuator/health`);
-            const json = await res.json();
-            setRedisStatus(json?.components?.redis?.status || "unknown");
-        })();
-    }, [refreshToken]);
+  // Decoding JWT:
+  const decodeJwt = (token: string): DecodedJWT | null => {
+    try {
+      const payload = token.split(".")[1];
+      return JSON.parse(atob(payload));
+    } catch {
+      return null;
+    }
+  };
+  useEffect(() => {
+    if (accessToken) {
+      setDecoded(decodeJwt(accessToken));
+    }
+  }, [accessToken]);
 
-    const masked = (t: string | null) => t ? t.substring(0, 16) + "..." : "N/A";
+  // Expiry Countdown for Tokens (Quality of Life stuff):
+  useEffect(() => {
+    if (!decoded?.exp) return;
 
-    return (
-        <div style={{ padding: 40, color: "#00FF41", fontFamily: "monospace" }}>
-            <NavBar />
-            <h1>Authentication Dashboard</h1>
-            <p>Logged in as: <b>{decoded?.sub}</b></p>
+    const timer = setInterval(() => {
+      const now = Math.floor(Date.now() / 1000);
+      const diff = decoded.exp - now;
 
-            <h2>Access Token</h2>
-            <p>{masked(accessToken)}</p>
-            <p>Expires: {decoded?.exp ? new Date(decoded.exp * 1000).toString() : "N/A"}</p>
+      if (diff <= 0) {
+        setExpiryCountdown("Expired");
+        clearInterval(timer);
+        return;
+      }
 
-            <h2>Refresh Token</h2>
-            <p>{masked(refreshToken)}</p>
-            <p>Redis status: {redisStatus}</p>
+      const mins = Math.floor(diff / 60);
+      const secs = diff % 60;
+      setExpiryCountdown(`${mins}m ${secs}s`);
+    }, 1000);
 
-            <button onClick={refresh} style={{ marginRight: 10 }}>Refresh Access Token</button>
-            <button onClick={logout}>Logout</button>
+    return () => clearInterval(timer);
+  }, [decoded]);
 
-            <hr/>
+  // Redis fetch:
+  useEffect(() => {
+    if (!accessToken || !refreshToken) return;
+    const fetchStatus = async () => {
+      try {
+        const res = await getRedisTokenStatus(accessToken, refreshToken);
+        setRedisStatus(res.active ? "Active" : "Not Found");
+      } catch {
+        setRedisStatus("Error");
+      }
+    };
+    fetchStatus();
+  }, [accessToken, refreshToken]);
 
-            <h3>Test Protected API</h3>
-            <button
-                onClick={async () => {
-                const res = await fetch("/graphql", {
-                    method: "POST",
-                    headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${accessToken}`,
-                    },
-                    body: JSON.stringify({ query: "{ tasks { id } }" }),
-                });
-                alert("GraphQL response: " + (await res.text()));
-                }}
+  // Manual refresh:
+  const handleRefresh = async () => {
+    if (!refreshToken) return;
+    setRefreshing(true);
+
+    const res = await refreshAccessToken(refreshToken);
+    if (res.accessToken && res.refreshToken) {
+      login(res.accessToken, res.refreshToken);
+      setDecoded(decodeJwt(res.accessToken));
+    } else {
+      alert("Failed to refresh token.");
+    }
+    setRefreshing(false);
+  };
+
+  const mask = (t: string) => t.slice(0, 16) + "..." + t.slice(-8);
+
+  // The code:
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#f6f8fa",
+        fontFamily: "monospace",
+      }}
+    >
+      <NavBar />
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          paddingTop: "40px",
+        }}
+      >
+        {/* PAGE TITLE */}
+        <h1 style={{ color: "#2d2d2d", marginBottom: "25px" }}>
+          Authentication Overview
+        </h1>
+
+        {/* MAIN CARD */}
+        <div
+          style={{
+            width: "480px",
+            padding: "25px",
+            backgroundColor: "#ffffff",
+            border: "2px solid #6db33f",
+            borderRadius: "12px",
+            boxShadow: "0 0 10px rgba(109,179,63,0.25)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+          }}
+        >
+          <h2 style={{ color: "#6db33f", marginBottom: "6px" }}>
+            Your Tokens
+          </h2>
+
+          <div>
+            <b>Access Token:</b>
+            <div style={{ marginTop: "3px", color: "#2d2d2d" }}>
+              {accessToken ? mask(accessToken) : "None"}
+            </div>
+          </div>
+
+          <div>
+            <b>Refresh Token:</b>
+            <div style={{ marginTop: "3px", color: "#2d2d2d" }}>
+              {refreshToken ? mask(refreshToken) : "None"}
+            </div>
+          </div>
+
+          {/* EXPIRY SECTION */}
+          {decoded && (
+            <>
+              <hr style={{ borderColor: "#6db33f" }} />
+
+              <div>
+                <b>Issued At:</b>{" "}
+                {new Date(decoded.iat * 1000).toLocaleString()}
+              </div>
+
+              <div>
+                <b>Expires At:</b>{" "}
+                {new Date(decoded.exp * 1000).toLocaleString()}
+              </div>
+
+              <div>
+                <b>Time Remaining:</b>{" "}
+                <span
+                  style={{
+                    color: expiryCountdown === "Expired" ? "red" : "#2d2d2d",
+                  }}
+                >
+                  {expiryCountdown}
+                </span>
+              </div>
+            </>
+          )}
+
+          {/* REDIS STATUS */}
+          <hr style={{ borderColor: "#6db33f" }} />
+          <div>
+            <b>Redis Refresh Token Entry:</b>{" "}
+            <span
+              style={{
+                color:
+                  redisStatus === "Active"
+                    ? "#6db33f"
+                    : redisStatus === "Error"
+                    ? "red"
+                    : "#cc0000",
+              }}
             >
-                Run Test Query
-            </button>
+              {redisStatus}
+            </span>
+          </div>
+
+          {/* REFRESH BUTTON */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            style={{
+              marginTop: "10px",
+              padding: "10px",
+              backgroundColor: refreshing ? "#85b577" : "#6db33f",
+              border: "none",
+              borderRadius: "6px",
+              color: "#ffffff",
+              fontWeight: "bold",
+              cursor: "pointer",
+              fontSize: "15px",
+              boxShadow: "0 0 8px rgba(109,179,63,0.4)",
+            }}
+          >
+            {refreshing ? "Refreshing..." : "Refresh Access Token"}
+          </button>
         </div>
-    );
+
+        {/* NAVIGATION OVERVIEW BOX */}
+        <div
+          style={{
+            width: "520x",
+            marginTop: "35px",
+            padding: "20px",
+            backgroundColor: "#ffffff",
+            border: "2px solid #6db33f",
+            borderRadius: "12px",
+            boxShadow: "0 0 10px rgba(109,179,63,0.25)",
+            color: "#2d2d2d",
+          }}
+        >
+          <h2 style={{ marginBottom: "10px", color: "#6db33f" }}>
+            Navigation Overview
+          </h2>
+          <ul style={{ lineHeight: "1.6" }}>
+            <li>
+              <b>Auth:</b> View tokens, expiry, Redis status, refresh flow. <b><i>You are here.</i></b>
+            </li>
+            <li>
+              <b>Tasks:</b> Create tasks & query DB via GraphQL.
+            </li>
+            <li>
+              <b>Processing:</b> Observe queue activity & task lifecycle.
+            </li>
+            <li>
+              <b>System Health:</b> View Actuator health & metrics summary.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
 }

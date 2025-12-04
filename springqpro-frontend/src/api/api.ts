@@ -31,7 +31,7 @@ export async function refreshAccessToken(refreshToken: string) {
     return res.json();
 }
 
-// [4] - /auth/refresh-status
+// [4] - /auth/refresh-status (NOTE: Added this later on -- doesn't match style but I don't care, I'm learning!!!)
 export async function getRedisTokenStatus(accessToken: string, refreshToken: string) {
     const url = `${API_BASE}/auth/refresh-status?refreshToken=${encodeURIComponent(refreshToken)}`;
     const res = await fetch(url, {

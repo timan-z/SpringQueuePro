@@ -25,7 +25,9 @@ export default function App() {
           {/* REGISTER PAGE: */}
           <Route path="/register" element={<RegisterPage />} />
           {/* TOKEN DASHBOARD: */}
-          <Route path="/token-dashboard" element={<ProtectedRoute><TokenDashboardPage /></ProtectedRoute>}/>
+          {/* <Route path="/token-dashboard" element={<ProtectedRoute><TokenDashboardPage /></ProtectedRoute>}/> */}
+          <Route path="/token-dashboard" element={<TokenDashboardPage />}/>
+          
           {/* TASKS PAGE: */}
           <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>}/>
 
