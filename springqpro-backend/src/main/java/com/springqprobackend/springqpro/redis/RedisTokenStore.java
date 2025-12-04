@@ -45,4 +45,5 @@ public class RedisTokenStore {
         logger.info("[RedisTokenStore] DELETE refreshToken");
         redis.delete("refresh:" + refreshToken);
     }
+    public boolean hasActiveToken(String email) { return redis.hasKey("refresh:" + email); }
 }

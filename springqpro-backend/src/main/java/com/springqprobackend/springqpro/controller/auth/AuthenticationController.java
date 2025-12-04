@@ -14,10 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.Map;
 
@@ -36,7 +33,7 @@ Implements:
   - /auth/logout (server-side token invalidation)
 Backed by:
   - UserEntity + UserRepository (Postgres)
-  -  JwtUtil (token creation/validation)
+  - JwtUtil (token creation/validation)
   - RedisTokenStore (refresh-token persistence)
   - RefreshTokenService (rotation + validation rules)
 [FUTURE WORK]:
@@ -147,6 +144,20 @@ public class AuthenticationController {
         String newRefresh = jwt.generateRefreshToken(email);
         redis.storeRefreshToken(newRefresh, email, refreshTtlMs);
         return new AuthResponse(newAccess, newRefresh);
+    }
+
+    // 2025-12-03-NOTE: Adding this for a front-end thing.
+    @GetMapping("/refresh-status")
+    public ResponseEntity<Map<String, Object>> refreshStatus(@RequestHeader("Authorization") String authHeader, @RequestParam("refreshToken") String refreshToken) {
+        if(authHeader == null || !authHeader.startsWith("Bearer ")) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing Authorization header");
+        if(refreshToken == null || refreshToken.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing refresh token");
+
+        String accessToken = authHeader.substring(7);
+        String emailFromJwt = jwt.extractEmail(accessToken);
+        // Redis returns email if the token is active
+        String storedEmail = redis.getEmailForToken(refreshToken);
+        boolean active = (storedEmail != null && storedEmail.equals(emailFromJwt));
+        return ResponseEntity.ok(Map.of("active", active));
     }
 
     // 2025-11-25-NOTE: ADDING THIS ENDPOINT. HAVING THIS SHOULD BE COMMONSENSE BUT IT'S ALSO GOOD FOR REFRESH TOKEN REMOVAL.
