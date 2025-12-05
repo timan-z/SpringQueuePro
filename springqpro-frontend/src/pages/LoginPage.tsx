@@ -62,10 +62,7 @@ export default function LoginPage() {
         try {
             const result = await loginUser(email, password);
             if (result.accessToken) {
-                login(result.accessToken, result.refreshToken);
-                // 2025-11-04-NOTE: If Login was a success both accessToken and refreshToken should be stored in browser localStorage:
-                localStorage.setItem("access-token", result.accessToken);
-                localStorage.setItem("refresh-token", result.refreshToken);
+                login(result.accessToken, result.refreshToken); // localStorage of accessToken and refreshToken will take place in AuthContext.tsx
                 navigate("/token-dashboard");
             } else {
                 setServerError("Invalid email or password.");

@@ -13,6 +13,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 /* SecurityConfig.java
 --------------------------------------------------------------------------------------------------
@@ -42,6 +47,7 @@ CloudQueue may adopt:
   - AWS Cognito JWT verification
 --------------------------------------------------------------------------------------------------
 */
+// 2025-12-05-NOTE:+DEBUG: Additions today are related to configuring CORS on the backend so my frontend can send API requests.
 
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -87,5 +93,28 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder encoder() {
         return new BCryptPasswordEncoder();
+    }
+    // 2025-12-05-NOTE: ADDED BELOW FOR CORS STUFF.
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        // Allowed origins for frontend
+        config.setAllowedOrigins(List.of(
+                "http://localhost:5173"                // local dev (TO-DO: append Netlify link later when frontend is deployed).
+        ));
+        // Important for JWT/Auth
+        config.setAllowCredentials(true);
+        config.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS"
+        ));
+        config.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type"
+        ));
+        // Optional: Expose Authorization header if needed
+        config.setExposedHeaders(List.of("Authorization"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }
