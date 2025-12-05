@@ -17,7 +17,9 @@ import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /* TaskGraphQLController.java
 --------------------------------------------------------------------------------------------------
@@ -121,6 +123,21 @@ public class TaskGraphQLController {
             return false;
         }
         return taskService.deleteTask(id);
+    }
+
+    /* 2025-12-04-NOTE: Adding a new method in the GraphQL Controller that exposes enums (useful for frontends
+    so they can parse the acceptable enums defined in schema.graphqls and avoid hardcoding values). */
+    @QueryMapping
+    @PreAuthorize("isAuthenticated()")
+    public Map<String, List<String>> taskEnums() {
+        return Map.of(
+                "taskTypes", Arrays.stream(TaskType.values())
+                        .map(Enum::name)
+                        .toList(),
+                "taskStatuses", Arrays.stream(TaskStatus.values())
+                        .map(Enum::name)
+                        .toList()
+        );
     }
 
     // 2025-11-17-DEBUG: I can't remember why the thing below was added.

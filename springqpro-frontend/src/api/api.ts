@@ -53,3 +53,25 @@ export async function logoutUser(refreshToken: string) {
     });
     return res.json();
 }
+
+// Utility API calls:
+export async function getEnumLists(accessToken: string) {
+    const query = `
+        query {
+            taskEnums {
+                taskTypes
+                taskStatuses
+            }
+        }
+    `;
+    const res = await fetch(`${API_BASE}/graphql`, {
+        method: "POST",
+        headers: {
+            "Content-Type":"application/json",
+            "Authorization":`Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ query })
+    });
+    const json = await res.json();
+    return json.data.taskEnums;
+}

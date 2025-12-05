@@ -4,13 +4,26 @@ spring:
     username: ${PGUSER}
     password: ${PGPASSWORD}
 
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+      idle-timeout: 10000          # 10s – close idle connections fairly quickly
+      max-lifetime: 30000          # 30s – recycle before Railway drops them
+      connection-timeout: 10000    # 10s – don't hang forever
+      validation-timeout: 5000     # 5s – quick fail for bad connections
+      leak-detection-threshold: 20000  # 20s – log if a connection is “stuck”
+
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: false
+    open-in-view: false
     properties:
       hibernate:
         format_sql: false
+        jdbc:
+          lob:
+            non_contextual_creation: true
 
   redis:
     host: ${REDISHOST}

@@ -1,4 +1,10 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+
+
+import { BrowserRouter, Routes, Route, Navigate} from "react-router-dom";
+
+
+
 import { AuthProvider } from "./utility/auth/AuthContext";
 import ProtectedRoute from "./utility/auth/ProtectedRoute";
 import LoginPage from "./pages/LoginPage";
@@ -18,6 +24,12 @@ export default function App() {
           with the CMDE project where I auto-default the default URL to re-direct to /login or the dashboard
           depending on the browser has localStorage tokens or whatever it was that I did. */}
           {/*<Route path="/" element={<Navigate to="/Login" replace/>} />*/}
+          
+          <Route path="/" element={<Navigate to="/login" replace/>} />
+
+
+
+
 
           {/* LOGIN PAGE: */}
           <Route path="/login" element={<LoginPage />} />
@@ -43,7 +55,7 @@ export default function App() {
 
           {/* Default root redirect: */}
           <Route path="*" element={<LoginPage />}/>
-\
+
         </Routes>
       </AuthProvider>
     </BrowserRouter>

@@ -1,21 +1,12 @@
 import { useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
-import { API_BASE } from "../api/api";
+import { API_BASE, getEnumLists } from "../api/api";
 import { useAuth } from "../utility/auth/AuthContext";
 
-// --- Types matching your schema.graphqls ---
-type TaskStatus = "QUEUED" | "INPROGRESS" | "COMPLETED" | "FAILED";
+/* -------------------- Types (auto-shaped dynamically) -------------------- */
 
-type TaskType =
-  | "EMAIL"
-  | "REPORT"
-  | "DATACLEANUP"
-  | "SMS"
-  | "NEWSLETTER"
-  | "TAKESLONG"
-  | "FAIL"
-  | "FAILABS"
-  | "TEST";
+type TaskType = string;
+type TaskStatus = string;
 
 interface Task {
   id: string;
@@ -27,39 +18,73 @@ interface Task {
   createdAt: string;
 }
 
-// --- Metric response shape from /actuator/metrics ---
 interface MetricResponse {
   name: string;
   measurements: { statistic: string; value: number }[];
   availableTags: any[];
 }
 
+/* ============================= MAIN COMPONENT ============================= */
+
 export default function TasksPage() {
   const { accessToken } = useAuth();
 
-  // ---- Create Task form state ----
+  /* -------------------- Dynamic Enum Lists -------------------- */
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+  const [taskStatuses, setTaskStatuses] = useState<TaskStatus[]>([]);
+  const [enumsLoaded, setEnumsLoaded] = useState(false);
+
+  /* -------------------- Create Form State -------------------- */
   const [payload, setPayload] = useState("");
-  const [taskType, setTaskType] = useState<TaskType>("EMAIL");
+  const [taskType, setTaskType] = useState<TaskType>("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // ---- GraphQL preview + response ----
-  const [lastMutationPreview, setLastMutationPreview] = useState<string>("");
-  const [lastResponseJson, setLastResponseJson] = useState<string>("");
+  /* -------------------- GraphQL Output State -------------------- */
+  const [lastMutationPreview, setLastMutationPreview] = useState("");
+  const [lastResponseJson, setLastResponseJson] = useState("");
 
-  // ---- Recent tasks ----
+  /* -------------------- Recent Tasks -------------------- */
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
 
-  // ---- Metrics snapshot ----
+  /* -------------------- Metrics -------------------- */
   const [submittedCount, setSubmittedCount] = useState<number | null>(null);
   const [completedCount, setCompletedCount] = useState<number | null>(null);
   const [failedCount, setFailedCount] = useState<number | null>(null);
   const [queueSize, setQueueSize] = useState<number | null>(null);
 
-  // ---------- Helper: Generic GraphQL caller ----------
+  /* -------------------- Load Enum Lists (taskEnums) -------------------- */
+
+  const loadEnumLists = async () => {
+    if (!accessToken) return;
+
+    try {
+      const enums = await getEnumLists(accessToken);
+      setTaskTypes(enums.taskTypes);
+      setTaskStatuses(enums.taskStatuses);
+
+      // preselect first available type
+      if (enums.taskTypes.length > 0) {
+        setTaskType(enums.taskTypes[0]);
+      }
+
+      setEnumsLoaded(true);
+    } catch (err) {
+      console.error("Failed to load GraphQL enum lists:", err);
+      setEnumsLoaded(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEnumLists();
+  }, [accessToken]);
+
+  /* -------------------- GraphQL Caller -------------------- */
+
   const callGraphQL = async (query: string, variables?: any) => {
     if (!accessToken) throw new Error("Missing access token");
+
     const res = await fetch(`${API_BASE}/graphql`, {
       method: "POST",
       headers: {
@@ -68,22 +93,27 @@ export default function TasksPage() {
       },
       body: JSON.stringify({ query, variables }),
     });
+
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`GraphQL error: ${res.status} - ${text}`);
     }
+
     return res.json();
   };
 
-  // ---------- Create Task handler ----------
+  /* -------------------- Create Task -------------------- */
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!payload.trim()) {
       setCreateError("Please enter a payload.");
       return;
     }
-    setCreateError(null);
+
     setCreating(true);
+    setCreateError(null);
 
     const mutation = `
       mutation CreateTask($input: CreateTaskInput!) {
@@ -106,7 +136,7 @@ export default function TasksPage() {
       },
     };
 
-    // Pretty preview of the mutation (for the “GraphQL preview” card)
+    // Pretty preview block
     const preview = `
 mutation {
   createTask(input: {
@@ -122,16 +152,17 @@ mutation {
     createdAt
   }
 }
-`.trim();
+    `.trim();
 
     setLastMutationPreview(preview);
 
     try {
       const json = await callGraphQL(mutation, variables);
+
       setLastResponseJson(JSON.stringify(json, null, 2));
-      // Clear the payload field for quick follow-up submits
       setPayload("");
-      // Refresh recent tasks immediately
+
+      // Immediately refresh recent tasks
       fetchRecentTasks();
     } catch (err: any) {
       setLastResponseJson(`Error: ${err.message ?? String(err)}`);
@@ -140,13 +171,15 @@ mutation {
     }
   };
 
-  // ---------- Fetch Recent Tasks ----------
+  /* -------------------- Recent Tasks Fetch -------------------- */
+
   const fetchRecentTasks = async () => {
     if (!accessToken) return;
+
     setLoadingTasks(true);
 
     const query = `
-      query RecentTasks {
+      query {
         tasks {
           id
           payload
@@ -163,11 +196,11 @@ mutation {
       const json = await callGraphQL(query);
       const tasks: Task[] = json.data.tasks ?? [];
 
-      // Sort by createdAt desc and take last 8
       const sorted = [...tasks].sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
+
       setRecentTasks(sorted.slice(0, 8));
     } catch (err) {
       console.error("Failed to fetch recent tasks:", err);
@@ -176,19 +209,17 @@ mutation {
     }
   };
 
-  // Auto-refresh recent tasks every 3 seconds
   useEffect(() => {
     fetchRecentTasks();
     const interval = setInterval(fetchRecentTasks, 3000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
-  // ---------- Retry (for FAILED tasks) ----------
+  /* -------------------- Retry Button -------------------- */
+
   const handleRetryTask = async (task: Task) => {
-    if (!accessToken) return;
     const mutation = `
-      mutation RetryTask($input: StdUpdateTaskInput!) {
+      mutation Retry($input: StdUpdateTaskInput!) {
         updateTask(input: $input) {
           id
           status
@@ -197,27 +228,23 @@ mutation {
       }
     `;
     const variables = {
-      input: {
-        id: task.id,
-        status: "QUEUED",
-      },
+      input: { id: task.id, status: "QUEUED" },
     };
+
     try {
       await callGraphQL(mutation, variables);
-      // after setting QUEUED in DB, ProcessingService / queue path can re-enqueue it
       fetchRecentTasks();
     } catch (err) {
       console.error("Failed to retry task:", err);
     }
   };
 
-  // ---------- Metrics Snapshot ----------
+  /* -------------------- Metrics -------------------- */
+
   const fetchMetric = async (key: string): Promise<number | null> => {
     try {
       const res = await fetch(`${API_BASE}/actuator/metrics/${key}`, {
-        headers: {
-          Authorization: accessToken ? `Bearer ${accessToken}` : "",
-        },
+        headers: { Authorization: accessToken ? `Bearer ${accessToken}` : "" },
       });
       if (!res.ok) return null;
       const json: MetricResponse = await res.json();
@@ -228,13 +255,13 @@ mutation {
   };
 
   const fetchMetrics = async () => {
-    if (!accessToken) return;
     const [submitted, completed, failed, queue] = await Promise.all([
       fetchMetric("springqpro_tasks_submitted_total"),
       fetchMetric("springqpro_tasks_completed_total"),
       fetchMetric("springqpro_tasks_failed_total"),
       fetchMetric("springqpro_queue_memory_size"),
     ]);
+
     setSubmittedCount(submitted);
     setCompletedCount(completed);
     setFailedCount(failed);
@@ -245,26 +272,27 @@ mutation {
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 5000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
-  // ---------- Status color helper ----------
+  /* -------------------- Status Color Helper -------------------- */
+
   const statusColor = (status: TaskStatus): string => {
     switch (status) {
       case "QUEUED":
-        return "#d9a441"; // yellow-ish
+        return "#d9a441";
       case "INPROGRESS":
-        return "#2f8faf"; // cyan/blue
+        return "#2f8faf";
       case "COMPLETED":
-        return "#2f9e44"; // green
+        return "#2f9e44";
       case "FAILED":
-        return "#d64545"; // red
+        return "#d64545";
       default:
         return "#2d2d2d";
     }
   };
 
-  // ------------------ RENDER ------------------
+  /* ============================= RENDER ============================= */
+
   return (
     <div
       style={{
@@ -291,9 +319,11 @@ mutation {
             gap: "24px",
           }}
         >
-          {/* LEFT COLUMN: Create + Preview */}
+
+          {/* -------------------- LEFT COLUMN -------------------- */}
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* Quick Create Card */}
+
+            {/* CREATE TASK */}
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -305,90 +335,73 @@ mutation {
             >
               <h2 style={{ marginTop: 0, color: "#6db33f" }}>Create Task</h2>
               <p style={{ color: "#555", fontSize: "14px" }}>
-                Enqueue a new task into SpringQueuePro via GraphQL.
+                Enqueue a new task using GraphQL.
               </p>
 
-              {createError && (
-                <div style={{ color: "#cc0000", fontSize: "13px", marginBottom: "8px" }}>
-                  ⚠ {createError}
+              {!enumsLoaded && (
+                <div style={{ color: "#777", marginBottom: "8px" }}>
+                  Loading allowed task types...
                 </div>
               )}
 
               <form onSubmit={handleCreateTask}>
+                {/* Payload */}
                 <div style={{ marginBottom: "10px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "4px",
-                      fontSize: "14px",
-                      color: "#2d2d2d",
-                    }}
-                  >
+                  <label style={{ display: "block", marginBottom: "4px" }}>
                     Payload
                   </label>
                   <input
                     value={payload}
                     onChange={(e) => setPayload(e.target.value)}
-                    placeholder="e.g., Send email to user@example.com"
+                    placeholder="e.g. Send newsletter..."
+                    disabled={!enumsLoaded}
                     style={{
                       width: "100%",
                       padding: "8px",
                       border: "1px solid #6db33f",
                       borderRadius: "4px",
-                      fontFamily: "monospace",
                     }}
                   />
                 </div>
 
+                {/* Task Type */}
                 <div style={{ marginBottom: "15px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "4px",
-                      fontSize: "14px",
-                      color: "#2d2d2d",
-                    }}
-                  >
+                  <label style={{ display: "block", marginBottom: "4px" }}>
                     Task Type
                   </label>
                   <select
                     value={taskType}
-                    onChange={(e) => setTaskType(e.target.value as TaskType)}
+                    onChange={(e) => setTaskType(e.target.value)}
+                    disabled={!enumsLoaded}
                     style={{
                       width: "100%",
                       padding: "8px",
                       border: "1px solid #6db33f",
                       borderRadius: "4px",
-                      fontFamily: "monospace",
                       backgroundColor: "#ffffff",
                     }}
                   >
-                    <option value="EMAIL">EMAIL</option>
-                    <option value="REPORT">REPORT</option>
-                    <option value="DATACLEANUP">DATACLEANUP</option>
-                    <option value="SMS">SMS</option>
-                    <option value="NEWSLETTER">NEWSLETTER</option>
-                    <option value="TAKESLONG">TAKESLONG</option>
-                    <option value="FAIL">FAIL (retry demo)</option>
-                    <option value="FAILABS">FAILABS</option>
-                    <option value="TEST">TEST</option>
+                    {taskTypes.map((tt) => (
+                      <option key={tt} value={tt}>
+                        {tt}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={creating}
+                  disabled={creating || !enumsLoaded}
                   style={{
                     width: "100%",
                     padding: "10px",
-                    backgroundColor: creating ? "#85b577" : "#6db33f",
+                    backgroundColor:
+                      creating || !enumsLoaded ? "#85b577" : "#6db33f",
                     border: "none",
                     borderRadius: "6px",
                     color: "#ffffff",
                     fontWeight: "bold",
-                    cursor: "pointer",
-                    fontSize: "15px",
-                    boxShadow: "0 0 8px rgba(109,179,63,0.4)",
+                    cursor: creating || !enumsLoaded ? "default" : "pointer",
                   }}
                 >
                   {creating ? "Creating..." : "Create Task"}
@@ -396,7 +409,7 @@ mutation {
               </form>
             </div>
 
-            {/* GraphQL Preview + Response */}
+            {/* GraphQL Preview Panel */}
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -407,6 +420,7 @@ mutation {
               }}
             >
               <h3 style={{ marginTop: 0, color: "#6db33f" }}>GraphQL Mutation</h3>
+
               <pre
                 style={{
                   backgroundColor: "#f0f4f0",
@@ -416,10 +430,13 @@ mutation {
                   overflowX: "auto",
                 }}
               >
-{lastMutationPreview || "// Fill the form and click Create Task to see the GraphQL mutation here."}
+{lastMutationPreview || "// Fill the form and click Create Task to see your GraphQL mutation here"}
               </pre>
 
-              <h3 style={{ marginTop: "14px", color: "#6db33f" }}>Last Response</h3>
+              <h3 style={{ marginTop: "14px", color: "#6db33f" }}>
+                Last Response
+              </h3>
+
               <pre
                 style={{
                   backgroundColor: "#f0f4f0",
@@ -429,13 +446,15 @@ mutation {
                   overflowX: "auto",
                 }}
               >
-{lastResponseJson || "// Response from backend will appear here."}
+{lastResponseJson || "// Response from SpringQueuePro will appear here"}
               </pre>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Recent tasks + Metrics */}
+          {/* -------------------- RIGHT COLUMN -------------------- */}
+
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
             {/* Recent Tasks */}
             <div
               style={{
@@ -447,17 +466,14 @@ mutation {
               }}
             >
               <h2 style={{ marginTop: 0, color: "#6db33f" }}>Recent Tasks</h2>
-              <p style={{ fontSize: "13px", color: "#555" }}>
-                Auto-refreshing every 3 seconds. Shows latest 8 tasks.
-              </p>
 
               {loadingTasks && (
-                <div style={{ fontSize: "13px", color: "#777" }}>Loading...</div>
+                <div style={{ fontSize: "13px", color: "#777" }}>Loading…</div>
               )}
 
-              {recentTasks.length === 0 && !loadingTasks && (
+              {!loadingTasks && recentTasks.length === 0 && (
                 <div style={{ fontSize: "13px", color: "#777" }}>
-                  No tasks found yet. Create one on the left.
+                  No tasks yet. Create one!
                 </div>
               )}
 
@@ -476,10 +492,11 @@ mutation {
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
-                      alignItems: "center",
                     }}
                   >
-                    <span style={{ fontSize: "13px", color: "#999" }}>{t.id}</span>
+                    <span style={{ fontSize: "13px", color: "#999" }}>
+                      {t.id}
+                    </span>
                     <span
                       style={{
                         fontSize: "13px",
@@ -492,8 +509,7 @@ mutation {
                   </div>
 
                   <div style={{ fontSize: "13px", color: "#333" }}>
-                    <b>Type:</b> {t.type} &nbsp; | &nbsp; <b>Attempts:</b>{" "}
-                    {t.attempts}/{t.maxRetries}
+                    <b>{t.type}</b> — Attempts {t.attempts}/{t.maxRetries}
                   </div>
 
                   <div style={{ fontSize: "12px", color: "#777" }}>
@@ -507,12 +523,12 @@ mutation {
                         marginTop: "4px",
                         alignSelf: "flex-start",
                         padding: "4px 8px",
-                        borderRadius: "4px",
-                        border: "1px solid #d64545",
                         backgroundColor: "#fff5f5",
+                        border: "1px solid #d64545",
                         color: "#d64545",
-                        fontSize: "12px",
+                        borderRadius: "4px",
                         cursor: "pointer",
+                        fontSize: "12px",
                       }}
                     >
                       Retry Task
@@ -534,29 +550,26 @@ mutation {
             >
               <h2 style={{ marginTop: 0, color: "#6db33f" }}>Queue Snapshot</h2>
               <p style={{ fontSize: "13px", color: "#555" }}>
-                Pulled from Spring Boot Actuator / Micrometer.
+                From Micrometer / Spring Boot Actuator.
               </p>
 
-              <div style={{ fontSize: "13px", lineHeight: "1.7", color: "#333" }}>
+              <div style={{ fontSize: "13px", lineHeight: "1.7" }}>
                 <div>
-                  <b>Tasks Submitted:</b>{" "}
-                  {submittedCount !== null ? submittedCount : "—"}
+                  <b>Tasks Submitted:</b> {submittedCount ?? "—"}
                 </div>
                 <div>
-                  <b>Tasks Completed:</b>{" "}
-                  {completedCount !== null ? completedCount : "—"}
+                  <b>Tasks Completed:</b> {completedCount ?? "—"}
                 </div>
                 <div>
-                  <b>Tasks Failed:</b>{" "}
-                  {failedCount !== null ? failedCount : "—"}
+                  <b>Tasks Failed:</b> {failedCount ?? "—"}
                 </div>
                 <div>
-                  <b>Queue Memory Size:</b>{" "}
-                  {queueSize !== null ? queueSize : "—"}
+                  <b>Queue Memory Size:</b> {queueSize ?? "—"}
                 </div>
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>
