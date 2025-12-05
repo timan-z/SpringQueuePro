@@ -11,7 +11,7 @@ export default function NavBar() {
           <Link to="/tasks" className="navLink">
             Tasks
           </Link>
-          <Link to="/processing" className="navLink">
+          <Link to="/processing-monitor" className="navLink">
             Processing
           </Link>
           <Link to="/system-health" className="navLink">

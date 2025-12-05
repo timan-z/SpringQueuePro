@@ -1,18 +1,11 @@
 import { useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
+//import { getHealth, getMetric } from "../api/api";
 import { useAuth } from "../utility/auth/AuthContext";
 
 interface HealthComponent {
   status: string;
   details?: any;
-}
-
-interface SystemMetrics {
-  submitted: number | null;
-  processed: number | null;
-  failed: number | null;
-  retried: number | null;
-  queueSize: number | null;
 }
 
 interface HealthResponse {
@@ -24,184 +17,215 @@ export default function SystemHealthPage() {
   const { accessToken } = useAuth();
 
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [metrics, setMetrics] = useState<any>({});
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const fetchHealth = async () => {
-    const res = await fetch("/actuator/health");
-    const json = await res.json();
-    setHealth(json);
-  };
+  // Mini-metrics snapshot
+  const [queueDepth, setQueueDepth] = useState<number | null>(null);
+  const [completed, setCompleted] = useState<number | null>(null);
+  const [failed, setFailed] = useState<number | null>(null);
 
-  const fetchMetric = async (key: string) => {
-    const res = await fetch(`/actuator/metrics/${key}`);
-    const json = await res.json();
-    return json.measurements?.[0]?.value ?? null;
-  };
-
-  const metricKeys: Record<keyof SystemMetrics, string> = {
-    submitted: "springqpro_tasks_submitted_total",
-    processed: "springqpro_tasks_completed_total",
-    failed: "springqpro_tasks_failed_total",
-    retried: "springqpro_tasks_retried_total",
-    queueSize: "springqpro_queue_memory_size"
-  };
-
-  const fetchMetrics = async () => {
-    const result: Partial<SystemMetrics> = {};
-
-    for (const [k, key] of Object.entries(metricKeys)) {
-        result[k as keyof SystemMetrics] = await fetchMetric(key);
+  // -----------------------------------------------------
+  // FETCH HEALTH INFO
+  // -----------------------------------------------------
+  /*const fetchHealth = async () => {
+    try {
+      const h = await getHealth();
+      setHealth(h);
+    } catch (err) {
+      console.error("Failed to fetch health", err);
     }
+  };*/
 
-    setMetrics(result as SystemMetrics);
-  };
+  // -----------------------------------------------------
+  // FETCH SYSTEM METRICS SNAPSHOT
+  // -----------------------------------------------------
+  /*const fetchMetrics = async () => {
+    try {
+      const depth = await getMetric("springqpro_queue_memory_size");
+      const comp = await getMetric("springqpro_tasks_completed_total");
+      const fail = await getMetric("springqpro_tasks_failed_total");
 
-  useEffect(() => {
-    fetchHealth();
-    fetchMetrics();
+      setQueueDepth(depth ?? null);
+      setCompleted(comp ?? null);
+      setFailed(fail ?? null);
+    } catch (err) {
+      console.error("Failed to fetch metrics", err);
+    }
+  };*/
 
-    if (!autoRefresh) return;
+  // -----------------------------------------------------
+  // INITIAL LOAD + AUTO-REFRESH
+  // -----------------------------------------------------
+  /*useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      await fetchHealth();
+      await fetchMetrics();
+      setLoading(false);
+    };
 
-    const id = setInterval(() => {
-      fetchHealth();
-      fetchMetrics();
+    load();
+
+    const interval = setInterval(() => {
+      load();
     }, 5000);
 
-    return () => clearInterval(id);
-  }, [autoRefresh]);
+    return () => clearInterval(interval);
+  }, []);*/
 
-  const colorFor = (status: string) => {
-    switch (status.toUpperCase()) {
-      case "UP":
-        return "#009933";
-      case "DOWN":
-        return "#cc0000";
-      default:
-        return "#ff9900"; // unknown, degraded
-    }
+  // -----------------------------------------------------
+  // STYLE HELPERS (SpringBoot aesthetic)
+  // -----------------------------------------------------
+  const container: React.CSSProperties = {
+    minHeight: "100vh",
+    backgroundColor: "#f6f8fa",
+    fontFamily: "monospace",
+    color: "#2d2d2d",
+    paddingBottom: "40px",
+  };
+
+  const card: React.CSSProperties = {
+    backgroundColor: "#ffffff",
+    border: "2px solid #6db33f",
+    borderRadius: "10px",
+    padding: "22px",
+    width: "600px",
+    boxShadow: "0 0 10px rgba(109,179,63,0.3)",
+    marginBottom: "25px",
+  };
+
+  const title: React.CSSProperties = {
+    fontSize: "1.3rem",
+    marginBottom: "12px",
+    color: "#2d2d2d",
+  };
+
+  const refreshBtn: React.CSSProperties = {
+    padding: "8px 12px",
+    backgroundColor: "#6db33f",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    marginTop: "10px",
+    boxShadow: "0 0 5px rgba(109,179,63,0.4)",
   };
 
   return (
-    <div>
+    <div style={container}>
       <NavBar />
 
-      <div style={{ padding: 30, fontFamily: "monospace" }}>
-        <h1>🩺 System Health Dashboard</h1>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          paddingTop: "30px",
+        }}
+      >
+        <h1 style={{ fontSize: "1.8rem", marginBottom: "25px" }}>
+          System Health Overview
+        </h1>
 
-        {/* Auto-refresh toggle */}
-        <label style={{ marginBottom: 25, display: "inline-block" }}>
-          <input
-            type="checkbox"
-            checked={autoRefresh}
-            onChange={() => setAutoRefresh(!autoRefresh)}
-            style={{ marginRight: 8 }}
-          />
-          Auto-refresh every 5 seconds
-        </label>
+        {/* ------------------------------------------------ */}
+        {/* HEALTH SUMMARY CARD */}
+        {/* ------------------------------------------------ */}
+        <div style={card}>
+          <h2 style={title}>Spring Boot /actuator/health</h2>
 
-        {/* Overall Health */}
-        {health && (
-          <div
-            style={{
-              border: "3px solid black",
-              borderRadius: 10,
-              padding: 20,
-              marginBottom: 30,
-              backgroundColor: "white"
-            }}
-          >
-            <h2>Overall Status</h2>
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: "bold",
-                color: colorFor(health.status)
-              }}
-            >
-              {health.status}
-            </div>
-          </div>
-        )}
+          {loading || !health ? (
+            <div>Loading system health…</div>
+          ) : (
+            <>
+              <div>
+                <b>Overall Status:</b>{" "}
+                <span
+                  style={{
+                    color: health.status === "UP" ? "#6db33f" : "red",
+                  }}
+                >
+                  {health.status}
+                </span>
+              </div>
 
-        {/* Component Health Grid */}
-        {health && (
-          <>
-            <h2>Component Status</h2>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 20,
-                marginBottom: 40
-              }}
-            >
+              <hr style={{ margin: "12px 0", borderColor: "#6db33f" }} />
+
               {Object.entries(health.components).map(([name, comp]) => (
                 <div
                   key={name}
                   style={{
-                    padding: 15,
-                    minWidth: 200,
-                    border: "2px solid black",
-                    borderRadius: 10,
-                    backgroundColor: "white"
+                    marginBottom: "10px",
+                    padding: "6px 0",
+                    borderBottom: "1px solid #e0e0e0",
                   }}
                 >
-                  <div style={{ fontSize: 16, marginBottom: 5 }}>
-                    {name.toUpperCase()}
-                  </div>
-                  <div
+                  <b>{name}: </b>
+                  <span
                     style={{
-                      fontWeight: "bold",
-                      color: colorFor(comp.status),
-                      fontSize: 20
+                      color: comp.status === "UP" ? "#6db33f" : "red",
                     }}
                   >
                     {comp.status}
-                  </div>
+                  </span>
                 </div>
               ))}
-            </div>
-          </>
-        )}
+            </>
+          )}
 
-        {/* Metrics Section */}
-        <h2>Key System Metrics</h2>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 20,
-            flexWrap: "wrap",
-            marginTop: 20
-          }}
-        >
-          <MetricBox label="Tasks Submitted" value={metrics.submitted} />
-          <MetricBox label="Tasks Processed" value={metrics.processed} />
-          <MetricBox label="Tasks Failed" value={metrics.failed} />
-          <MetricBox label="Retries" value={metrics.retried} />
-          <MetricBox label="Queue Size (Memory)" value={metrics.queueSize} />
+          <button
+            style={refreshBtn}
+            onClick={() => {
+              setLoading(true);
+              /*fetchHealth();
+              fetchMetrics();*/
+              setLoading(false);
+            }}
+          >
+            Refresh Now
+          </button>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function MetricBox({ label, value }: { label: string; value: number }) {
-  return (
-    <div
-      style={{
-        border: "2px solid black",
-        padding: "12px 18px",
-        borderRadius: 10,
-        backgroundColor: "white",
-        minWidth: 160,
-        textAlign: "center"
-      }}
-    >
-      <div style={{ fontSize: 13, opacity: 0.7 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: "bold", marginTop: 4 }}>
-        {value ?? 0}
+        {/* ------------------------------------------------ */}
+        {/* METRICS SNAPSHOT */}
+        {/* ------------------------------------------------ */}
+        <div style={card}>
+          <h2 style={title}>Metrics Snapshot</h2>
+
+          {loading ? (
+            <div>Loading metrics…</div>
+          ) : (
+            <>
+              <div style={{ marginBottom: "8px" }}>
+                <b>Queue Depth:</b> {queueDepth ?? "N/A"}
+              </div>
+
+              <div style={{ marginBottom: "8px" }}>
+                <b>Total Completed Tasks:</b> {completed ?? "N/A"}
+              </div>
+
+              <div style={{ marginBottom: "8px" }}>
+                <b>Total Failed Tasks:</b> {failed ?? "N/A"}
+              </div>
+
+              <div style={{ fontSize: "13px", color: "#555", marginTop: "10px" }}>
+                * Metrics updated every 5 seconds.
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ------------------------------------------------ */}
+        {/* FOOTNOTE */}
+        {/* ------------------------------------------------ */}
+        <div style={{ width: "600px", textAlign: "center", marginTop: "10px" }}>
+          <p style={{ fontSize: "13px", color: "#555" }}>
+            This information is pulled from{" "}
+            <code style={{ color: "#6db33f" }}>/actuator/health</code> and{" "}
+            <code style={{ color: "#6db33f" }}>/actuator/metrics</code>, offering
+            a high-level snapshot of SpringQueuePro’s infrastructure health.
+          </p>
+        </div>
       </div>
     </div>
   );
