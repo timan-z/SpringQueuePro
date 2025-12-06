@@ -51,6 +51,13 @@ input StdUpdateTaskInput {
     attempts: Int
 }
 """
+2025-12-05-NOTE: Adding this type mostly for the sake of the frontend (dynamically loading in the enums):
+"""
+type TaskEnums {
+    taskTypes: [String!]!
+    taskStatuses: [String!]!
+}
+"""
 Queries for fetching tasks.
 All queries automatically apply per-user filtering (by createdBy) at the controller/service layer.
 """
