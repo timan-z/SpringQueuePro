@@ -67,9 +67,7 @@ public class TaskGraphQLController {
     private static final Logger logger = LoggerFactory.getLogger(ProcessingService.class);
     private final TaskService taskService;
     // Constructor(s):
-    public TaskGraphQLController(TaskService taskService) {
-        this.taskService = taskService;
-    }
+    public TaskGraphQLController(TaskService taskService) { this.taskService = taskService; }
 
     // QUERIES:
     @QueryMapping   // This is GraphQL query resolver.
@@ -124,6 +122,32 @@ public class TaskGraphQLController {
         }
         return taskService.deleteTask(id);
     }
+
+
+
+
+    // 2025-12-05-NOTE: Adding this one mostly for frontend purposes but it should be here too.
+    /*@MutationMapping
+    @Transactional
+    @PreAuthorize("isAuthenticated()")
+    public TaskEntity retryTask(@Argument String id, Authentication auth) {
+        String owner = auth.getName();
+        logger.info("INFO: GraphQL 'retryTask' (id={}) sent by user: {}", id, owner);
+        // Ensure task belongs to current user
+        TaskEntity task = taskService.getTaskForUser(id, owner).orElseThrow(() -> new RuntimeException("Task not found or not owned by user"));
+        // Reset DB state: status = QUEUED, reset attempts to 0:
+        taskService.updateStatus(id, TaskStatus.QUEUED, 0);
+        // Re-fetch after DB update
+        TaskEntity updated = taskService.getTaskForUser(id, owner).orElseThrow();
+
+        processingService.enqueue(updated);
+
+        logger.info("INFO: Task {} re-enqueued for retry", id);
+
+        return updated;
+    }*/
+
+
 
     /* 2025-12-04-NOTE: Adding a new method in the GraphQL Controller that exposes enums (useful for frontends
     so they can parse the acceptable enums defined in schema.graphqls and avoid hardcoding values). */

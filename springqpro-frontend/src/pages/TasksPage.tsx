@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
 import { API_BASE, getEnumLists } from "../api/api";
 import { useAuth } from "../utility/auth/AuthContext";
+
+/* NOTE:+TO-DO:
+- I WANT TO ADD A "CLEAR" BUTTON FOR THE MOST RECENT TASKS BUT THE PROBLEM IS THAT EVERYTIME
+IT RE-LOADS THE WHOLE THING COMES BACK ANYWAYS!!!
+*/
 
 /* -------------------- Types (auto-shaped dynamically) -------------------- */
 
@@ -48,11 +53,16 @@ export default function TasksPage() {
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
 
+  // 2025-12-05-NOTE: New state to keep track of Tasks in the "Recent Tasks" tab that the current user actually made:
+  const [myOwnedTaskIds, setMyOwnedTaskIds] = useState<Set<string>>(new Set());
+
   /* -------------------- Metrics -------------------- */
   const [submittedCount, setSubmittedCount] = useState<number | null>(null);
   const [completedCount, setCompletedCount] = useState<number | null>(null);
   const [failedCount, setFailedCount] = useState<number | null>(null);
   const [queueSize, setQueueSize] = useState<number | null>(null);
+
+  const lastCreatedIdRef = useRef<string | null>(null);
 
   /* -------------------- Load Enum Lists (taskEnums) -------------------- */
 
@@ -138,26 +148,29 @@ export default function TasksPage() {
 
     // Pretty preview block
     const preview = `
-mutation {
-  createTask(input: {
-    payload: "${payload}",
-    type: ${taskType}
-  }) {
-    id
-    payload
-    type
-    status
-    attempts
-    maxRetries
-    createdAt
-  }
-}
+    mutation {
+      createTask(input: {
+        payload: "${payload}",
+        type: ${taskType}
+      }) {
+        id
+        payload
+        type
+        status
+        attempts
+        maxRetries
+        createdAt
+      }
+    }
     `.trim();
 
     setLastMutationPreview(preview);
 
     try {
       const json = await callGraphQL(mutation, variables);
+      const created = json.data.createTask;
+
+      lastCreatedIdRef.current = created.id;  // save id.
 
       setLastResponseJson(JSON.stringify(json, null, 2));
       setPayload("");
@@ -168,6 +181,36 @@ mutation {
       setLastResponseJson(`Error: ${err.message ?? String(err)}`);
     } finally {
       setCreating(false);
+    }
+  };
+
+  // Function to requery the backend and get "last response" for the GraphQL section:
+  const refreshLastResponse = async () => {
+    const id = lastCreatedIdRef.current;
+    if (!id) {
+      setLastResponseJson("// No task created yet to refresh");
+      return;
+    }
+
+    const query = `
+      query {
+        task(id: "${id}") {
+          id
+          payload
+          type
+          status
+          attempts
+          maxRetries
+          createdAt
+        }
+      }
+    `;
+
+    try {
+      const json = await callGraphQL(query);
+      setLastResponseJson(JSON.stringify(json, null, 2));
+    } catch (err: any) {
+      setLastResponseJson(`Error refreshing: ${err.message}`);
     }
   };
 
@@ -228,11 +271,17 @@ mutation {
       }
     `;
     const variables = {
-      input: { id: task.id, status: "QUEUED" },
+      input: { id: task.id, status: "QUEUED", attempts: task.attempts },
     };
 
     try {
       await callGraphQL(mutation, variables);
+      // optimistic update (instant UI feedback)
+      setRecentTasks(prev =>
+        prev.map(t =>
+          t.id === task.id ? { ...t, status: "QUEUED" } : t
+        )
+      );
       fetchRecentTasks();
     } catch (err) {
       console.error("Failed to retry task:", err);
@@ -433,9 +482,28 @@ mutation {
 {lastMutationPreview || "// Fill the form and click Create Task to see your GraphQL mutation here"}
               </pre>
 
-              <h3 style={{ marginTop: "14px", color: "#6db33f" }}>
-                Last Response
-              </h3>
+              <div style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                alignItems: "center",
+                marginTop: "14px"
+              }}>
+                <h3 style={{ margin: 0, color: "#6db33f" }}>Last Response</h3>
+
+                <button
+                  onClick={refreshLastResponse}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "11px",
+                    borderRadius: "4px",
+                    border: "1px solid #6db33f",
+                    background: "#f0f4f0",
+                    cursor: "pointer"
+                  }}
+                >
+                  Refresh
+                </button>
+              </div>
 
               <pre
                 style={{
@@ -463,13 +531,17 @@ mutation {
                 borderRadius: "10px",
                 boxShadow: "0 0 10px rgba(109,179,63,0.25)",
                 padding: "16px",
+                maxHeight: "320px",
+                overflowY: "auto",
               }}
             >
               <h2 style={{ marginTop: 0, color: "#6db33f" }}>Recent Tasks</h2>
 
-              {loadingTasks && (
-                <div style={{ fontSize: "13px", color: "#777" }}>Loading…</div>
-              )}
+              <div style={{ height: "18px", marginBottom: "4px" }}>
+                {loadingTasks && (
+                  <span style={{ fontSize: "13px", color: "#777" }}>Loading…</span>
+                )}
+              </div>
 
               {!loadingTasks && recentTasks.length === 0 && (
                 <div style={{ fontSize: "13px", color: "#777" }}>

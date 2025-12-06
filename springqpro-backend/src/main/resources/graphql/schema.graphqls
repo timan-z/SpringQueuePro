@@ -95,4 +95,9 @@ type Mutation {
     Deleting a Task by ID:
     """
     deleteTask(id: ID!): Boolean!
+    """
+    2025-12-05-NOTE: Adding this one for the frontend...
+    Retrying a Task by ID:
+    """
+    retryTask(id: ID!): Task!
 }
