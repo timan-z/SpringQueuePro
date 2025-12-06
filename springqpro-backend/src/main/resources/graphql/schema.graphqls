@@ -75,6 +75,10 @@ type Query {
     Retrieving a single task given ID:
     """
     task(id: ID!): Task
+    """
+    2025-12-05-NOTE: NEW
+    """
+    taskEnums: TaskEnums!
 }
 # Mutation = to update/write data.
 type Mutation {
