@@ -164,7 +164,7 @@ export default function RegisterPage() {
                             id="register-email"
                             ref={emailRef}
                             type="email"
-                            placeholder="you@example.com"
+                            placeholder="sample_email@example.com"
                             style={{
                             width: "100%",
                             padding: "8px 10px",
@@ -207,7 +207,7 @@ export default function RegisterPage() {
                             id="register-password"
                             ref={passwordRef}
                             type="password"
-                            placeholder="At least 8 characters"
+                            placeholder="Make it at least 8 characters"
                             style={{
                             width: "100%",
                             padding: "8px 10px",

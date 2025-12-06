@@ -1,6 +1,24 @@
-import { Link } from "react-router-dom";
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { logoutUser } from "../api/api.ts";
+import { useAuth } from "../utility/auth/AuthContext.tsx";
 
 export default function NavBar() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async(e: React.FormEvent) => {
+      e.preventDefault();
+      try {
+        await logout();
+        navigate("/login");
+      } catch(err) {
+        // NOTE:+TO-DO:(?) console.warn("Logout request failed - proceeding with local logout only.");
+        // NOTE:+TO-DO: ^ Could add something in my AuthContext to set all the states to null/remove localStorage stuff (if needed).
+        console.error("Logout failed", err);
+      }
+  }
+
   return (
     <div className="navBar">
       <nav className="navContainer">
@@ -23,7 +41,7 @@ export default function NavBar() {
         </div>
 
         <div className="navRight">
-          <button className="logoutBtn"> {/* SOON: onClick={handleLogout} */}
+          <button className="logoutBtn" onClick={handleLogout}>
             Logout
           </button>
         </div>
