@@ -3,6 +3,7 @@ package com.springqprobackend.springqpro.service;
 import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.domain.event.TaskCreatedEvent;
 import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.handlers.TaskHandler;
 import com.springqprobackend.springqpro.mapper.TaskMapper;
 import com.springqprobackend.springqpro.models.Task;
@@ -23,8 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 
-import java.util.Optional;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /* ProcessingService.java
@@ -129,6 +133,7 @@ public class ProcessingService {
     private final QueueService queueService; // to re-enqueue by id when scheduling retries
     private final RedisDistributedLock redisLock;   // 2025-11-23-DEBUG: REDIS INTEGRATION PHASE!
     private final TaskRedisRepository cache;    // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java
+    private final Deque<String> eventLog = new ArrayDeque<>();
 
     @Autowired
     private ApplicationEventPublisher publisher;
@@ -169,6 +174,7 @@ public class ProcessingService {
     // The retry doesn’t live inside the handler anymore — it’s a post-processing policy in ProcessingService. If it throws, the failure is caught in the ProcessingService try/catch block.
     @Transactional  // <-- forgot this, it should 100% be here.
     public void claimAndProcess(String taskId) {
+        logEvent("CLAIM_START " + taskId);
         /* 2025-11-24-DEBUG: ADDING STRONG VALIDATION TO THIS METHOD AS PART OF JWT INTEGRATION!!!
         ProcessingService MUST NOT trust or execute invalid Ids!!! */
         if (!taskRepository.existsById(taskId)) {
@@ -194,6 +200,7 @@ public class ProcessingService {
         }
 
         tasksClaimedCounter.increment();    // DEBUG: METRICS ADDITION.
+        logEvent("CLAIM_SUCCESS " + taskId + " attempt=" + (current.getAttempts()));
 
         em.flush();
         em.refresh(current);
@@ -205,8 +212,10 @@ public class ProcessingService {
         // 2025-11-23-DEBUG: OVERHAULING MY claimAndProcess METHOD LOGIC [1 - BELOW]:
         String lockKey = "task:lock:" + taskId;
         String token = redisLock.tryLock(lockKey, 2000);    // 2025-11-23-DEBUG:+TO-DO: Going to use 2000 for the processing time (that's what's in application.yml I think).
+        logEvent("LOCK_ACQUIRED " + taskId);
         if(token == null) {
             // NOTE: REDIS LOCK NOT WORKING MEANS, FOR SAFETY, I SHOULD SET STATUS OF TASK BACK TO QUEUED SO OTHER CONSUMERS CAN GET IT:
+            logEvent("LOCK_FAILED " + taskId + " returning task to QUEUED");
             taskRepository.transitionStatus(taskId, TaskStatus.INPROGRESS, TaskStatus.QUEUED, claimed.getAttempts());
             return;
         }
@@ -222,6 +231,7 @@ public class ProcessingService {
             Need to use recordCallable to wrap the stuff when exceptions are possible. standard "callable"
             won't propogate the exception to the outer try-catch block (it'll swallow the damn thing!). */
             processingTimer.recordCallable(() -> {
+                logEvent("PROCESSING " + taskId + " type=" + model.getType());
                 TaskHandler handler = handlerRegistry.getHandler(model.getType().name());
                 if (handler == null) handler = handlerRegistry.getHandler("DEFAULT");
                 handler.handle(model);
@@ -232,6 +242,7 @@ public class ProcessingService {
             TaskEntity persisted = taskRepository.save(claimed);
             cache.put(claimed); // 2025-11-23-DEBUG: REFACTORING FOR TaskRedisRepository.java
             tasksCompletedCounter.increment();  // 2025-11-26-NOTE: METRICS ADDITION!
+            logEvent("COMPLETED " + taskId);
             logger.info("[ProcessingService] after save - id: {}, status: {}, attempts: {}, version: {}", persisted.getId(), persisted.getStatus(), persisted.getAttempts(), persisted.getVersion());
         } catch(Exception ex) {
             // ProcessingService catches Task FAILs gracefully - marking it as FAILED, persisting it, and re-enqueuing it with backoff.
@@ -241,6 +252,7 @@ public class ProcessingService {
             taskRepository.save(claimed);
             cache.put(claimed); // 2025-11-23-DEBUG: REFACTORING FOR TaskRedisRepository.java
             tasksFailedCounter.increment(); // 2025-11-26-NOTE: METRICS ADDITION!
+            logEvent("FAILED " + taskId + " attempt=" + claimed.getAttempts());
 
             em.flush();
             em.refresh(claimed);
@@ -255,12 +267,15 @@ public class ProcessingService {
                 logger.info("[ProcessingService] requeue DB update for {} returned {}", taskId, requeued);
                 tasksRetriedCounter.increment();    // 2025-11-26-NOTE: METRICS ADDITION!
                 scheduler.schedule(() -> queueService.enqueueById(taskId), delayMs, TimeUnit.MILLISECONDS);
+                logEvent("RETRY_SCHEDULED " + taskId + " delayMs=" + delayMs);
             } else {
                 // permanent failure:
                 logger.error("Task failed permanently. DEBUG: Come and write a more detailed case here later I barely slept.");
+                logEvent("FAILED_PERMANENTLY " + taskId);
             }
         } finally {
-          redisLock.unlock(lockKey, token); // 2025-11-23-DEBUG: LAST ADDITION FOR TaskRedisRepository.java REFACTORING PHASE.
+            redisLock.unlock(lockKey, token); // 2025-11-23-DEBUG: LAST ADDITION FOR TaskRedisRepository.java REFACTORING PHASE.
+            logEvent("LOCK_RELEASE " + taskId);
         }
         logger.info("[ProcessingService] finishing claimAndProcess for {} -> status now {}", taskId, claimed.getStatus());
     }
@@ -269,6 +284,7 @@ public class ProcessingService {
     // 2025-12-07-NOTE: Adding a manual "retry" method (this was in the QueueService-era model of the project, never added it to ProcessingService era):
     @Transactional
     public boolean manuallyRequeue(String taskId) {
+        logEvent("RETRY_SCHEDULED_MANUALLY " + taskId);
         Optional<TaskEntity> opt = taskRepository.findById(taskId);
         if(opt.isEmpty()) {
             logger.warn("[ManualRequeue] Task {} not found.", taskId);
@@ -309,5 +325,32 @@ public class ProcessingService {
     private long computeBackoffMs(int attempts) {
         // exponential backoff base 1000ms. apparently this is common practice in cloud stuff so might as well start it now.
         return (long) (1000 * Math.pow(2, Math.max(0, attempts - 1)));
+    }
+
+    // 2025-12-07-NOTE:+DEBUG: Metrics-related utility methods mainly for quality-of-life frontend features:
+    public void logEvent(String msg) {
+        synchronized (eventLog) {
+            eventLog.addFirst("[" + Instant.now() + "] " + msg);
+            if (eventLog.size() > 200) eventLog.removeLast();  // size-bound buffer
+        }
+    }
+    public List<String> getRecentLogEvents() {
+        synchronized (eventLog) {
+            return new ArrayList<>(eventLog);
+        }
+    }
+    public Map<String, Object> getWorkerStatus() {
+        ThreadPoolExecutor exec = queueService.getExecutor();
+        int active = exec.getActiveCount();
+        int pool = exec.getPoolSize();
+        int idle = pool - active;
+
+        // Optional: if QueueService tracks # tasks currently processing - I have no idea.
+        int inFlight = active;
+        return Map.of(
+                "active", active,
+                "idle", idle,
+                "inFlight", inFlight
+        );
     }
 }

@@ -9,6 +9,7 @@ import TasksPage from "./pages/TasksPage";
 import SystemHealthPage from "./pages/SystemHealthPage";
 import ProcessingMonitorPage from "./pages/ProcessingMonitorPage";
 import AboutPage from "./pages/AboutPage";
+import TasksDashboardPage from "./pages/TaskDashboardPage";
 
 // Function that'll check for Access Token and Refresh Token validity for determining default site page (/login or /token-dashboard): 
 function DefaultRoute() {
@@ -36,6 +37,9 @@ export default function App() {
 
           {/* TASKS PAGE: */}
           <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>}/>
+
+          {/* TASKS DASHBOARD PAGE: */}
+          <Route path="/tasks-dashboard" element={<ProtectedRoute><TasksDashboardPage/></ProtectedRoute>}/>
 
           {/* PROCESSING MONITOR PAGE: */}
           <Route path="/processing-monitor" element={<ProtectedRoute><ProcessingMonitorPage/></ProtectedRoute>}/>

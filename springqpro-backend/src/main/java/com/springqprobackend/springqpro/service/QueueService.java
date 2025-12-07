@@ -151,7 +151,12 @@ public class QueueService {
         });
     }
 
-    // Methods:
+    // 2025-12-07-NOTE: Some utility methods:
+    public ThreadPoolExecutor getExecutor() {
+        return (ThreadPoolExecutor) executor;
+    }
+
+    // OLD Methods:
     // 1. Translating GoQueue's "func (q * Queue) Enqueue(t task.Task) {...}" function:
     // EDIT: THE VERSION OF enqueue BELOW IS NOW LEGACY CODE FROM THE PROTOTYPE PHASE! enqueueById ABOVE WILL BE USED BY ProcessingService.java.
     @Deprecated

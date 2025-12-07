@@ -1,20 +1,13 @@
 import { useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
 import TaskDetailDrawer from "../components/TaskDetailDrawer";
-import { API_BASE } from "../api/api";
+import { API_BASE, getEnumLists } from "../api/api";
 import { useAuth } from "../utility/auth/AuthContext";
 
-type Status = "QUEUED" | "INPROGRESS" | "COMPLETED" | "FAILED";
-type TaskType =
-  | "EMAIL"
-  | "REPORT"
-  | "DATACLEANUP"
-  | "SMS"
-  | "NEWSLETTER"
-  | "TAKESLONG"
-  | "FAIL"
-  | "FAILABS"
-  | "TEST";
+/* -------------------- Types -------------------- */
+
+type TaskType = string;
+type Status = string;
 
 interface Task {
   id: string;
@@ -26,22 +19,32 @@ interface Task {
   createdAt: string;
 }
 
+/* ============================================================
+                      TASKS DASHBOARD PAGE
+   ============================================================ */
 export default function TasksDashboardPage() {
   const { accessToken } = useAuth();
 
+  /* ---------- Dynamic Enums from Schema ---------- */
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+  const [taskStatuses, setTaskStatuses] = useState<Status[]>([]);
+  const [enumsLoaded, setEnumsLoaded] = useState(false);
+
+  /* ---------- Data ---------- */
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Filters
+  /* ---------- Filters ---------- */
   const [statusFilter, setStatusFilter] = useState<Status | "ALL">("ALL");
   const [typeFilter, setTypeFilter] = useState<TaskType | "ALL">("ALL");
+  const [searchId, setSearchId] = useState("");
 
-  // Sorting
+  /* ---------- Sorting ---------- */
   const [sortKey, setSortKey] = useState<keyof Task>("createdAt");
   const [sortAsc, setSortAsc] = useState(false);
 
-  // GraphQL Explorer
-  const [gqlQuery, setGqlQuery] = useState<string>(`
+  /* ---------- GraphQL Explorer ---------- */
+  const [gqlQuery, setGqlQuery] = useState(`
 {
   tasks {
     id
@@ -53,14 +56,17 @@ export default function TasksDashboardPage() {
     createdAt
   }
 }
-  `);
-  const [gqlResult, setGqlResult] = useState<string>("");
+  `.trim());
+  const [gqlResult, setGqlResult] = useState("");
 
-  // Drawer
+  /* ---------- Drawer ---------- */
   const [drawerTask, setDrawerTask] = useState<Task | null>(null);
-  const [drawerQuery, setDrawerQuery] = useState<string>("");
+  const [drawerQuery, setDrawerQuery] = useState("");
 
-  // ----- Helper -----
+  /* ---------- Auto-refresh ---------- */
+  const [autoRefresh, setAutoRefresh] = useState(true);
+
+  /* -------------------- Generic GQL Caller -------------------- */
   const gql = async (query: string, variables?: any) => {
     const res = await fetch(`${API_BASE}/graphql`, {
       method: "POST",
@@ -73,8 +79,31 @@ export default function TasksDashboardPage() {
     return res.json();
   };
 
-  // ----- Load tasks -----
+  /* ============================================================
+                      Load Enum Lists (Dynamic)
+     ============================================================ */
+  const loadEnumLists = async () => {
+    if (!accessToken) return;
+    try {
+      const enums = await getEnumLists(accessToken);
+      setTaskTypes(enums.taskTypes);
+      setTaskStatuses(enums.taskStatuses);
+      setEnumsLoaded(true);
+    } catch (err) {
+      console.error("Failed to fetch GraphQL enum lists:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadEnumLists();
+  }, [accessToken]);
+
+  /* ============================================================
+                          Fetch ALL tasks
+     ============================================================ */
   const loadTasks = async () => {
+    if (!accessToken) return;
+
     setLoading(true);
 
     const query = `
@@ -100,7 +129,17 @@ export default function TasksDashboardPage() {
     loadTasks();
   }, []);
 
-  // ----- Retry task -----
+  /* Auto-refresh toggle */
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(loadTasks, 3500);
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
+
+  /* ============================================================
+                      Retry / Delete Tasks
+     ============================================================ */
   const retryTask = async (task: Task) => {
     const mutation = `
       mutation Retry($input: StdUpdateTaskInput!) {
@@ -119,28 +158,33 @@ export default function TasksDashboardPage() {
     loadTasks();
   };
 
-  // ----- Delete task -----
   const deleteTask = async (task: Task) => {
     const mutation = `
       mutation DeleteTask($id: ID!) {
         deleteTask(id: $id)
       }
     `;
-
     await gql(mutation, { id: task.id });
     loadTasks();
   };
 
-  // ----- Run GraphQL Explorer -----
+  /* ============================================================
+                      GraphQL Explorer: Run Query
+     ============================================================ */
   const runExplorer = async () => {
     const json = await gql(gqlQuery);
     setGqlResult(JSON.stringify(json, null, 2));
   };
 
-  // ----- Apply filters + sorting -----
+  /* ============================================================
+                      Apply Filters + Sorting + Search
+     ============================================================ */
   const tasksView = [...tasks]
     .filter((t) => (statusFilter === "ALL" ? true : t.status === statusFilter))
     .filter((t) => (typeFilter === "ALL" ? true : t.type === typeFilter))
+    .filter((t) =>
+      searchId.trim() === "" ? true : t.id.includes(searchId.trim())
+    )
     .sort((a, b) => {
       const aVal = (a as any)[sortKey];
       const bVal = (b as any)[sortKey];
@@ -148,7 +192,9 @@ export default function TasksDashboardPage() {
       return aVal < bVal ? 1 : -1;
     });
 
-  // ----- Status color -----
+  /* ============================================================
+                      Status Color
+     ============================================================ */
   const statusColor = (s: Status) =>
     s === "COMPLETED"
       ? "#2f9e44"
@@ -158,6 +204,9 @@ export default function TasksDashboardPage() {
       ? "#2f8faf"
       : "#d9a441";
 
+  /* ============================================================
+                           RENDER
+     ============================================================ */
   return (
     <div style={{ backgroundColor: "#f6f8fa", minHeight: "100vh" }}>
       <NavBar />
@@ -168,19 +217,25 @@ export default function TasksDashboardPage() {
         </h1>
 
         <p style={{ marginTop: "-10px", color: "#444" }}>
-          Full system introspection: GraphQL, metrics, filters, task lifecycle.
+          Deep system introspection: GraphQL, analytics, filtering, retries,
+          locking, and full task lifecycle.
         </p>
 
-        {/* ========== LAYOUT GRID ========== */}
+        {/* ======================================================
+                         MAIN GRID LAYOUT
+         ====================================================== */}
         <div
           style={{
+            marginTop: "20px",
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: "24px",
-            marginTop: "20px",
           }}
         >
-          {/* LEFT: TABLE */}
+
+          {/* ==============================================================  
+                           LEFT CARD — TASK TABLE
+            ============================================================== */}
           <div
             style={{
               background: "white",
@@ -192,8 +247,16 @@ export default function TasksDashboardPage() {
           >
             <h2 style={{ marginTop: 0, color: "#6db33f" }}>All Tasks</h2>
 
-            {/* Filters */}
-            <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+            {/* ----- FILTERS ----- */}
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                marginBottom: "12px",
+                alignItems: "center",
+              }}
+            >
+              {/* Status Filter */}
               <select
                 value={statusFilter}
                 onChange={(e) =>
@@ -203,15 +266,18 @@ export default function TasksDashboardPage() {
                   padding: "6px",
                   border: "1px solid #6db33f",
                   borderRadius: "4px",
+                  fontFamily: "monospace",
                 }}
               >
                 <option value="ALL">All Statuses</option>
-                <option value="QUEUED">Queued</option>
-                <option value="INPROGRESS">In-Progress</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="FAILED">Failed</option>
+                {taskStatuses.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </select>
 
+              {/* Type Filter */}
               <select
                 value={typeFilter}
                 onChange={(e) =>
@@ -221,22 +287,49 @@ export default function TasksDashboardPage() {
                   padding: "6px",
                   border: "1px solid #6db33f",
                   borderRadius: "4px",
+                  fontFamily: "monospace",
                 }}
               >
                 <option value="ALL">All Types</option>
-                <option value="EMAIL">EMAIL</option>
-                <option value="REPORT">REPORT</option>
-                <option value="DATACLEANUP">DATACLEANUP</option>
-                <option value="SMS">SMS</option>
-                <option value="NEWSLETTER">NEWSLETTER</option>
-                <option value="TAKESLONG">TAKESLONG</option>
-                <option value="FAIL">FAIL</option>
-                <option value="FAILABS">FAILABS</option>
-                <option value="TEST">TEST</option>
+                {taskTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
               </select>
+
+              {/* Search by ID */}
+              <input
+                placeholder="Search by ID…"
+                value={searchId}
+                onChange={(e) => setSearchId(e.target.value)}
+                style={{
+                  padding: "6px",
+                  border: "1px solid #6db33f",
+                  borderRadius: "4px",
+                  fontFamily: "monospace",
+                  flex: 1,
+                }}
+              />
+
+              {/* Auto-refresh Toggle */}
+              <button
+                onClick={() => setAutoRefresh((v) => !v)}
+                style={{
+                  padding: "6px 10px",
+                  fontSize: "12px",
+                  backgroundColor: autoRefresh ? "#6db33f" : "#c2c2c2",
+                  color: autoRefresh ? "white" : "#333",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                {autoRefresh ? "Auto: ON" : "Auto: OFF"}
+              </button>
             </div>
 
-            {/* Table */}
+            {/* ----- TABLE SCROLL WRAPPER ----- */}
             <div
               style={{
                 maxHeight: "650px",
@@ -244,7 +337,7 @@ export default function TasksDashboardPage() {
                 borderTop: "1px solid #ddd",
               }}
             >
-              {loading && <div>Loading...</div>}
+              {loading && <div>Loading…</div>}
 
               {tasksView.map((t) => (
                 <div
@@ -252,38 +345,36 @@ export default function TasksDashboardPage() {
                   style={{
                     padding: "10px 6px",
                     borderBottom: "1px solid #eee",
-                    cursor: "pointer",
                   }}
                 >
-                  {/* Row Top */}
+                  {/* Row header */}
                   <div
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
                       fontSize: "13px",
+                      cursor: "pointer",
+                    }}
+                    onClick={async () => {
+                      const q = `
+                        query TaskById {
+                          task(id: "${t.id}") {
+                            id
+                            payload
+                            type
+                            status
+                            attempts
+                            maxRetries
+                            createdAt
+                          }
+                        }
+                      `;
+                      const json = await gql(q);
+                      setDrawerTask(json.data.task);
+                      setDrawerQuery(q);
                     }}
                   >
-                    <span
-                      onClick={async () => {
-                        const q = `
-                          query TaskById {
-                            task(id: "${t.id}") {
-                              id
-                              payload
-                              type
-                              status
-                              attempts
-                              maxRetries
-                              createdAt
-                            }
-                          }
-                        `;
-                        const json = await gql(q);
-                        setDrawerTask(json.data.task);
-                        setDrawerQuery(q);
-                      }}
-                      style={{ color: "#666", textDecoration: "underline" }}
-                    >
+                    <span style={{ color: "#666", textDecoration: "underline" }}>
                       {t.id}
                     </span>
 
@@ -292,12 +383,19 @@ export default function TasksDashboardPage() {
                     </span>
                   </div>
 
+                  {/* Detail */}
                   <div style={{ fontSize: "12px", color: "#444" }}>
-                    {t.type} • attempts {t.attempts}/{t.maxRetries}
+                    {t.type} — attempts {t.attempts}/{t.maxRetries}
                   </div>
 
                   {/* Row Actions */}
-                  <div style={{ marginTop: "6px", display: "flex", gap: "6px" }}>
+                  <div
+                    style={{
+                      marginTop: "6px",
+                      display: "flex",
+                      gap: "6px",
+                    }}
+                  >
                     {t.status === "FAILED" && (
                       <button
                         onClick={() => retryTask(t)}
@@ -308,6 +406,7 @@ export default function TasksDashboardPage() {
                           color: "#d64545",
                           border: "1px solid #d64545",
                           borderRadius: "4px",
+                          cursor: "pointer",
                         }}
                       >
                         Retry
@@ -323,6 +422,7 @@ export default function TasksDashboardPage() {
                         color: "#666",
                         border: "1px solid #aaa",
                         borderRadius: "4px",
+                        cursor: "pointer",
                       }}
                     >
                       Delete
@@ -333,7 +433,9 @@ export default function TasksDashboardPage() {
             </div>
           </div>
 
-          {/* RIGHT: GraphQL Explorer */}
+          {/* ==============================================================  
+                      RIGHT CARD — SAFE GRAPHQL EXPLORER
+            ============================================================== */}
           <div
             style={{
               background: "white",
@@ -395,7 +497,9 @@ export default function TasksDashboardPage() {
         </div>
       </div>
 
-      {/* Drawer */}
+      {/* ==============================================================  
+                        TASK DETAIL DRAWER
+         ============================================================== */}
       <TaskDetailDrawer
         task={drawerTask}
         graphqlQuery={drawerQuery}

@@ -261,9 +261,6 @@ export default function TasksPage() {
   /* -------------------- Retry Button -------------------- */
 
   const handleRetryTask = async (task: Task) => {
-
-    console.log("DEBUG:[handleRetryTask] - ENTERED INSIDE OF METHOD!");
-
     const mutation = `
       mutation($id: ID!) {
         retryTask(id: $id)
@@ -272,9 +269,6 @@ export default function TasksPage() {
     const variables = { id: task.id };
 
     try {
-
-      console.log("DEBUG:[handleRetryTask] - About to call callGraphQL(mutation, variables);");
-
       await callGraphQL(mutation, variables);
       // optimistic update (instant UI feedback)
       setRecentTasks(prev =>

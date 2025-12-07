@@ -75,3 +75,26 @@ export async function getEnumLists(accessToken: string) {
     const json = await res.json();
     return json.data.taskEnums;
 }
+
+// queue data and function stuff and also /actuator/metrics:
+export async function getWorkerStatus(accessToken: string) {
+  const res = await fetch(`${API_BASE}/internal/workers`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  return res.json();
+}
+
+export async function getProcessingEvents(accessToken: string) {
+  const res = await fetch(`${API_BASE}/internal/events`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  return res.json();
+}
+
+export async function getMetric(name: string, accessToken: string) {
+  const res = await fetch(`${API_BASE}/actuator/metrics/${name}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const json = await res.json();
+  return json.measurements?.[0]?.value ?? null;
+}

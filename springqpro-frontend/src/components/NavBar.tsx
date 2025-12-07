@@ -29,6 +29,9 @@ export default function NavBar() {
           <Link to="/tasks" className="navLink">
             Tasks
           </Link>
+          <Link to="/tasks-dashboard" className="navLink">
+            Tasks Dashboard
+          </Link>
           <Link to="/processing-monitor" className="navLink">
             Processing
           </Link>
