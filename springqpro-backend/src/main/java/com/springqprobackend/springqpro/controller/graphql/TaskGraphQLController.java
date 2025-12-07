@@ -129,7 +129,7 @@ public class TaskGraphQLController {
 
     @MutationMapping
     @PreAuthorize("isAuthenticated()")
-    public boolean requeueTask(@Argument String id, Authentication auth) {
+    public boolean retryTask(@Argument String id, Authentication auth) {
         String owner = auth.getName();
         logger.info("INFO: GraphQL 'requeueTask' (id={}) Query sent by user:{}", id, owner);
         // ownership check:
