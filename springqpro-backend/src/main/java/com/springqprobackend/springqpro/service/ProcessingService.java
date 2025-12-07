@@ -260,6 +260,32 @@ public class ProcessingService {
     }
     // 2025-11-23-DEBUG: OVERHAULING MY claimAndProcess METHOD LOGIC [ABOVE].
 
+    // 2025-12-07-NOTE: Adding a manual "retry" method (this was in the QueueService-era model of the project, never added it to ProcessingService era):
+    @Transactional
+    public boolean manuallyRequeue(String taskId) {
+        Optional<TaskEntity> opt = taskRepository.findById(taskId);
+        if(opt.isEmpty()) return false;
+
+        TaskEntity task = opt.get();
+        // Only FAILED tasks may be manually requeued
+        if (task.getStatus() != TaskStatus.FAILED) {
+            logger.warn("[ManualRequeue] Task {} is not FAILED, ignoring.", taskId);
+            return false;
+        }
+        // Reset status to QUEUED for the sake of auto-retry:
+        int updated = taskRepository.transitionStatusSimple(taskId, TaskStatus.FAILED, TaskStatus.QUEUED);
+        if(updated == 0) {
+            logger.warn("[ManualRequeue] DB Transition FAILED->QUEUED did not update any rows.");
+            return false;
+        }
+        // Update the cache:
+        cache.put(task);
+        // Push into in-memory queue immediately:
+        queueService.enqueueById(taskId);
+        logger.info("[ManualRequeue] Task {} successfully re-enqueued manually.", taskId);
+        return true;
+    }
+
     /* NOTE: In my original setup from the ProtoType phase (SpringQueue), I had fixed times set for the Task processing
     time. For Tasks that FAIL, that's not the greatest idea (static and don't adapt to retries). It's more professional
     to have something like the method below which uses "dynamic backoff." Which is better because:

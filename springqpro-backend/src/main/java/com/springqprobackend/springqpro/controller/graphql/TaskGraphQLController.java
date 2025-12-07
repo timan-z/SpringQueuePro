@@ -66,8 +66,12 @@ public class TaskGraphQLController {
     // Field(s):
     private static final Logger logger = LoggerFactory.getLogger(ProcessingService.class);
     private final TaskService taskService;
+    private final ProcessingService processingService;
     // Constructor(s):
-    public TaskGraphQLController(TaskService taskService) { this.taskService = taskService; }
+    public TaskGraphQLController(TaskService taskService, ProcessingService processingService) {
+        this.taskService = taskService;
+        this.processingService = processingService;
+    }
 
     // QUERIES:
     @QueryMapping   // This is GraphQL query resolver.
@@ -123,31 +127,16 @@ public class TaskGraphQLController {
         return taskService.deleteTask(id);
     }
 
-
-
-
-    // 2025-12-05-NOTE: Adding this one mostly for frontend purposes but it should be here too.
-    /*@MutationMapping
-    @Transactional
+    @MutationMapping
     @PreAuthorize("isAuthenticated()")
-    public TaskEntity retryTask(@Argument String id, Authentication auth) {
+    public boolean requeueTask(@Argument String id, Authentication auth) {
         String owner = auth.getName();
-        logger.info("INFO: GraphQL 'retryTask' (id={}) sent by user: {}", id, owner);
-        // Ensure task belongs to current user
-        TaskEntity task = taskService.getTaskForUser(id, owner).orElseThrow(() -> new RuntimeException("Task not found or not owned by user"));
-        // Reset DB state: status = QUEUED, reset attempts to 0:
-        taskService.updateStatus(id, TaskStatus.QUEUED, 0);
-        // Re-fetch after DB update
-        TaskEntity updated = taskService.getTaskForUser(id, owner).orElseThrow();
-
-        processingService.enqueue(updated);
-
-        logger.info("INFO: Task {} re-enqueued for retry", id);
-
-        return updated;
-    }*/
-
-
+        logger.info("INFO: GraphQL 'requeueTask' (id={}) Query sent by user:{}", id, owner);
+        // ownership check:
+        taskService.getTaskForUser(id, owner).orElseThrow(() -> new RuntimeException("Task not found or not owned by user."));
+        return processingService.manuallyRequeue(id);
+        //return processingService.manuallyRequeue(id);
+    }
 
     /* 2025-12-04-NOTE: Adding a new method in the GraphQL Controller that exposes enums (useful for frontends
     so they can parse the acceptable enums defined in schema.graphqls and avoid hardcoding values). */
@@ -164,10 +153,4 @@ public class TaskGraphQLController {
         );
     }
 
-    // 2025-11-17-DEBUG: I can't remember why the thing below was added.
-    /*@SchemaMapping(typeName = "Task", field = "payload")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
-    public String securePayload(TaskEntity entity) {
-        return entity.getPayload();
-    }*/
 }
