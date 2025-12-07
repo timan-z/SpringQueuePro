@@ -273,7 +273,7 @@ public class ProcessingService {
             return false;
         }
         // Reset status to QUEUED for the sake of auto-retry:
-        int updated = taskRepository.transitionStatusSimple(taskId, TaskStatus.FAILED, TaskStatus.QUEUED);
+        int updated = taskRepository.transitionStatus(taskId, TaskStatus.FAILED, TaskStatus.QUEUED, 0);
         if(updated == 0) {
             logger.warn("[ManualRequeue] DB Transition FAILED->QUEUED did not update any rows.");
             return false;
