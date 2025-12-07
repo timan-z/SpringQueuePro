@@ -135,7 +135,6 @@ public class TaskGraphQLController {
         // ownership check:
         taskService.getTaskForUser(id, owner).orElseThrow(() -> new RuntimeException("Task not found or not owned by user."));
         return processingService.manuallyRequeue(id);
-        //return processingService.manuallyRequeue(id);
     }
 
     /* 2025-12-04-NOTE: Adding a new method in the GraphQL Controller that exposes enums (useful for frontends

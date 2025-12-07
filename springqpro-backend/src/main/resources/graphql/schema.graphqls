@@ -99,5 +99,5 @@ type Mutation {
     2025-12-05-NOTE: Adding this one for the frontend...
     Retrying a Task by ID:
     """
-    retryTask(id: ID!): Task!
+    retryTask(id: ID!): Boolean!
 }

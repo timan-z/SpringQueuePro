@@ -1,6 +1,7 @@
 package com.springqprobackend.springqpro.service;
 
 import com.springqprobackend.springqpro.domain.entity.TaskEntity;
+import com.springqprobackend.springqpro.domain.event.TaskCreatedEvent;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.handlers.TaskHandler;
 import com.springqprobackend.springqpro.mapper.TaskMapper;
@@ -13,8 +14,10 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import io.micrometer.core.instrument.Counter;
@@ -126,6 +129,9 @@ public class ProcessingService {
     private final QueueService queueService; // to re-enqueue by id when scheduling retries
     private final RedisDistributedLock redisLock;   // 2025-11-23-DEBUG: REDIS INTEGRATION PHASE!
     private final TaskRedisRepository cache;    // 2025-11-23-DEBUG: Refactoring for TaskRedisRepository.java
+
+    @Autowired
+    private ApplicationEventPublisher publisher;
 
     // 2025-11-26-NOTE:+DEBUG: METRICS PHASE FIELD ADDITIONS:
     private final Counter tasksSubmittedCounter;
@@ -264,25 +270,28 @@ public class ProcessingService {
     @Transactional
     public boolean manuallyRequeue(String taskId) {
         Optional<TaskEntity> opt = taskRepository.findById(taskId);
-        if(opt.isEmpty()) return false;
-
+        if(opt.isEmpty()) {
+            logger.warn("[ManualRequeue] Task {} not found.", taskId);
+            return false;
+        }
         TaskEntity task = opt.get();
         // Only FAILED tasks may be manually requeued
         if (task.getStatus() != TaskStatus.FAILED) {
             logger.warn("[ManualRequeue] Task {} is not FAILED, ignoring.", taskId);
             return false;
         }
-        // Reset status to QUEUED for the sake of auto-retry:
+        // Reset status to QUEUED (and attempts to 0) for the sake of auto-retry:
         int updated = taskRepository.transitionStatus(taskId, TaskStatus.FAILED, TaskStatus.QUEUED, 0);
         if(updated == 0) {
             logger.warn("[ManualRequeue] DB Transition FAILED->QUEUED did not update any rows.");
             return false;
         }
-        // Update the cache:
-        cache.put(task);
-        // Push into in-memory queue immediately:
-        queueService.enqueueById(taskId);
-        logger.info("[ManualRequeue] Task {} successfully re-enqueued manually.", taskId);
+        // Re-read the fresh entity and update the cache:
+        TaskEntity refreshed = taskRepository.findById(taskId).orElseThrow();
+        cache.put(refreshed);
+        // Publish event - the listener will call enqueueById after the AFTER COMMIT (this is deliberate, can't directly call enqueueById, it's a bad idea):
+        publisher.publishEvent(new TaskCreatedEvent(this, taskId));
+        logger.info("[ManualRequeue] Task {} successfully re-enqueued manually (AFTER_COMMIT will enqueue worker).", taskId);
         return true;
     }
 
