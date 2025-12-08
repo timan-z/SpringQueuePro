@@ -78,14 +78,14 @@ export async function getEnumLists(accessToken: string) {
 
 // queue data and function stuff and also /actuator/metrics:
 export async function getWorkerStatus(accessToken: string) {
-  const res = await fetch(`${API_BASE}/internal/workers`, {
+  const res = await fetch(`${API_BASE}/api/processing/workers`, {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
   return res.json();
 }
 
 export async function getProcessingEvents(accessToken: string) {
-  const res = await fetch(`${API_BASE}/internal/events`, {
+  const res = await fetch(`${API_BASE}/api/processing/events`, {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
   return res.json();
@@ -97,4 +97,19 @@ export async function getMetric(name: string, accessToken: string) {
   });
   const json = await res.json();
   return json.measurements?.[0]?.value ?? null;
+}
+
+// for the system health page:
+export async function getSystemHealth(accessToken: string) {
+  const res = await fetch(`${API_BASE}/api/internal/health`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  return res.json();
+}
+
+export async function getSystemMetric(name: string, accessToken: string) {
+  const res = await fetch(`${API_BASE}/api/internal/metric/${name}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  return res.json();
 }
