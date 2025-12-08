@@ -101,7 +101,7 @@ public class SecurityConfig {
         // Allowed origins for frontend
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",                // local dev (TO-DO: append Netlify link later when frontend is deployed).
-                "https://springqueuepro-production.up.railway.app"
+                "https://springqueuepro.netlify.app"
         ));
         // Important for JWT/Auth
         config.setAllowCredentials(true);
