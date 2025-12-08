@@ -22,6 +22,7 @@ export default function AboutPage() {
           task-processing engine built with modern cloud-ready fundamentals:
           JWT-based authentication, Redis-backed distributed locking, PostgreSQL
           persistence, retry policies, Prometheus metrics, and Spring Boot 3.
+          {" "}<b>NOTE: THIS IS A QUICK PROJECT SUMMARY FOR AN MVP DASHBOARD (TO BE FLESHED OUT IN DETAIL SOON).</b>
         </p>
 
         <p>
@@ -79,7 +80,7 @@ export default function AboutPage() {
         └──────┘                 └────────┘
                         │
                 ┌────┴─────┐
-                │ Grafana   │ (Monitoring dashboard)
+                │ Grafana   │ (SOON-TO-COME: Monitoring dashboard)
                 └───────────┘
         `}
         </pre>
