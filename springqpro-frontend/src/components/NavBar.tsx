@@ -1,6 +1,5 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { logoutUser } from "../api/api.ts";
 import { useAuth } from "../utility/auth/AuthContext.tsx";
 
 export default function NavBar() {

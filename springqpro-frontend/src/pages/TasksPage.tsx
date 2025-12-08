@@ -36,14 +36,14 @@ export default function TasksPage() {
 
   /* -------------------- Dynamic Enum Lists -------------------- */
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
-  const [taskStatuses, setTaskStatuses] = useState<TaskStatus[]>([]);
+  //const [taskStatuses, setTaskStatuses] = useState<TaskStatus[]>([]);
   const [enumsLoaded, setEnumsLoaded] = useState(false);
 
   /* -------------------- Create Form State -------------------- */
   const [payload, setPayload] = useState("");
   const [taskType, setTaskType] = useState<TaskType>("");
   const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  //const [createError, setCreateError] = useState<string | null>(null);
 
   /* -------------------- GraphQL Output State -------------------- */
   const [lastMutationPreview, setLastMutationPreview] = useState("");
@@ -54,7 +54,7 @@ export default function TasksPage() {
   const [loadingTasks, setLoadingTasks] = useState(false);
 
   // 2025-12-05-NOTE: New state to keep track of Tasks in the "Recent Tasks" tab that the current user actually made:
-  const [myOwnedTaskIds, setMyOwnedTaskIds] = useState<Set<string>>(new Set());
+  //const [myOwnedTaskIds, setMyOwnedTaskIds] = useState<Set<string>>(new Set());
 
   /* -------------------- Metrics -------------------- */
   const [submittedCount, setSubmittedCount] = useState<number | null>(null);
@@ -72,7 +72,7 @@ export default function TasksPage() {
     try {
       const enums = await getEnumLists(accessToken);
       setTaskTypes(enums.taskTypes);
-      setTaskStatuses(enums.taskStatuses);
+      //setTaskStatuses(enums.taskStatuses);
 
       // preselect first available type
       if (enums.taskTypes.length > 0) {
@@ -118,12 +118,12 @@ export default function TasksPage() {
     e.preventDefault();
 
     if (!payload.trim()) {
-      setCreateError("Please enter a payload.");
+      //setCreateError("Please enter a payload.");
       return;
     }
 
     setCreating(true);
-    setCreateError(null);
+    //setCreateError(null);
 
     const mutation = `
       mutation CreateTask($input: CreateTaskInput!) {

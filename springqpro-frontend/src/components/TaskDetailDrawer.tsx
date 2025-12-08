@@ -2,8 +2,6 @@
 /* This wil slide in from the right-hand side of the screen, show the full task JSON, show the GraphQL query
 used to fetch it, and includes a close button.
 */
-import React from "react";
-
 interface TaskDetailDrawerProps {
   task: any | null;
   graphqlQuery: string;
