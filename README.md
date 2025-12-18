@@ -67,7 +67,7 @@ All components are containerized using Docker and designed to run identically in
 
 
 
-```
+```mermaid
 flowchart LR
     Client[Client<br/>(React Dashboard / API Clients)]
 
