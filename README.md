@@ -4,35 +4,124 @@
 <u>Date</u>: <b>11/30/2025</b> (core backend system, *frontend dashboard finished by 12/8/2025*).<br>
 <u>Description</u>: <b>This is a Production-Grade Distributed Task Queue System Built with Java, Spring Boot, Redis, PostgreSQL, GraphQL, REST APIs & React-TypeScript (among various other technologies).</b>
 
+## Table of Contents
+- [Overview](#overview)
+- [Key Features](#key-features)
+
 ## Overview
 
-**SpringQueuePro** is a distributed, fault-tolerant task processing platform that draws inspiration from real services like **Celery**, **BullMQ**, and **AWS SQS**. It was built and implemented from scratch in **Java** and **Spring Boot 3**. It features **persistent tasks**, **Redis-backed distributed locking**, **automatic retries with exponential backoff**, **JWT authentication**, **GraphQL & REST APIs**, and a **real-time React-TS dashboard**. Fully instrumented with **Micrometer + Prometheus** and integration-tested using **Testcontainers**. (As of 2025/12/09 its backend and related databases are hosted on **Railway**; its frontend dashboard on **Netlify**).
+**SpringQueuePro** is a distributed, fault-tolerant task processing platform that draws inspiration from real services like **Celery**, **BullMQ**, and **AWS SQS**. It was built and implemented from scratch in **Java** and **Spring Boot 3**. It features **persistent tasks**, **Redis-backed distributed locking**, **automatic retries with exponential backoff**, **JWT authentication**, **GraphQL & REST APIs**, and a **real-time React-TS dashboard**. Fully instrumented with **Micrometer + Prometheus** and integration-tested using **Testcontainers**. SpringQueuePro is designed as a backend-focused demonstration of how modern distributed task queues are architected in production environments, emphasizing correctness, observability, and fault tolerance over raw throughput. 
 
-### System Architecture Summary
-
-- Like any professional distributed job queue system, SpringQueuePro is built around a fully event-driven, asynchronous task execution pipeline with durable persistence, coordinated concurrency, and robust reliability guarantees.
-
-- At its core, SpringQueuePro models a distributed worker-thread architecture: tasks are persisted in PostgreSQL, coordinated via atomic state transitions, claimed safely using Redis-based distributed locks, and executed on a configurable ExecutorService worker pool. This design guarantees idempotent task processing, prevents race conditions when multiple workers (threads) compete for the same job, and ensures that each task is processed exactly once (or retired safely under controlled backoff).
-
-- The platform supports automatic retries with exponential backoff, dead-task prevention, and stateful lifecycle management (**QUEUED → IN_PROGRESS → COMPLETED / FAILED**). Processing logic is fully decoupled using a TaskHandler registry, enabling clean extensibility and domain separation.
-
-- All APIs — both GraphQL and REST — are protected through a modern JWT authentication system with access + refresh tokens, token rotation, revocation, and a Redis-backed refresh token store. The security pipeline uses a stateless Spring Security filter chain, custom authentication filters, and strict authorization boundaries around internal queue management endpoints.
-
-- SpringQueuePro implements role-based access control (RBAC) using Spring Security’s stateless filter chain. Each request passes through a JWT authentication filter that validates tokens, loads user roles from the database, and attaches an authenticated UserDetails principal to the security context. Both GraphQL and REST routes enforce fine-grained authorization rules — public endpoints (login/register) are open, while all internal queue management APIs require authenticated users with the proper roles, ensuring strong separation between public interfaces and privileged system operations.
-
-- SpringQueuePro is fully observability-ready. Using Micrometer, Spring Actuator, and Prometheus, the system records metrics for:
-task throughput, retry rates, worker pool utilization, processing duration histograms, queue depth, API call counts, Postgres/Redis health, and JVM resource usage. These metrics are validated using Testcontainers-powered integration tests, ensuring correctness across real Postgres + Redis environments. 
-
-- A lightweight React + TypeScript Dashboard provides a visual interface for interacting with the system — allowing user authentication, task creation, queue inspection, and health monitoring of the backend services. **The entire stack is containerized with Docker**.
-
-For my own sake, SpringQueuePro — aside from the practical experience gained in building such a complex system using Java and Spring Boot — was meant to be an exercise to better my expertise in distributed systems, concurrency control, queue design, cloud-native observability (*this will be expanded on in the **Future Improvements** section*), security architecture, and full-stack application development, all packaged in a clean, maintainable, and extensible software engineering project.
+(As of 2025/12/09 its backend and related databases are hosted on **Railway**; its frontend dashboard on **Netlify**).
 
 ## Why the SpringQueue-"*Pro*"?
 - **SpringQueuePro** is a professional, production-grade evolution of my aptly-titled **SpringQueue** project, an earlier primitive system that mimicked the same core functionality but tightly-coupled and limited in its extensibility, modularity, and production-like features. **SpringQueue** (***base***) was an intentionally skeletal job queue system and little more than an implementation of the Producer-Consumer model created to help learn the basics of Spring Boot. (*Additionally, it served to refresh my Java fundamentals after an absence from using the language. Not to mention an excuse to work with concurrency patterns in Java*).
 
-- SpringQueue itself is a parallel implementation of **GoQueue**, an even earlier job queue project I built — also implementing the Producer-Consumer model, made to practice concurrency and thread-pool patterns in Go (Golang) using Go primitives like goroutines, channels, and mutexes. SpringQueue was a translation of GoQueue but refactored to make it more "idiomatically Java" (e.g., using an ExecutorService as the core thread manager). 
----
+- SpringQueue itself is a parallel implementation of **GoQueue**, an even earlier job queue project I built — also implementing the Producer-Consumer model, made to practice concurrency and thread-pool patterns in Go (Golang) using Go primitives like goroutines, channels, and mutexes. SpringQueue was a translation of GoQueue but refactored to make it more "idiomatically Java" (e.g., using an ExecutorService as the core thread manager).
+
 ## Key Features
+- Distributed task processing with durable persistence (PostgreSQL)
+- Redis-backed distributed locking to prevent double execution (race conditions).
+- Atomic task state transitions (**QUEUED → IN_PROGRESS → COMPLETED / FAILED**)
+- Automatic retries with exponential backoff
+- Pluggable TaskHandler registry for extensible job logic
+- JWT authentication with access + refresh tokens and rotation
+- Role-based access control (RBAC) across GraphQL and REST APIs
+- Fully instrumented with Micrometer + Prometheus
+- Integration-tested using Testcontainers (Postgres + Redis)
+- Dockerized for local development and cloud deployment
+
+## System Architecture (Conceptual)
+
+At a high level, the SpringQueuePro system is comprised of:
+
+- **API Layer (GraphQL + REST)**  
+  Exposes authenticated endpoints for task creation, inspection, and administration. All APIs are protected using a stateless JWT-based security model with role-based access control (RBAC).
+
+- **Persistence Layer (PostgreSQL)**  
+  Acts as the system of record for all tasks. Each task follows a strict lifecycle
+  (**QUEUED → IN_PROGRESS → COMPLETED / FAILED**) enforced via atomic state transitions to prevent race conditions and duplicate execution.
+
+- **Distributed Coordination Layer (Redis)**  
+  Provides distributed locks and ephemeral coordination primitives. Redis-backed locks ensure that only one worker may claim and process a task at a time, even under concurrent execution. (*The traditiional caching "fast-lookup" utility of Redis is—of course—used too, but this is its most significant purpose*).
+
+- **Execution Layer (ExecutorService Worker Pool)**  
+  A configurable thread pool executes tasks asynchronously. Workers claim tasks transactionally, execute handler logic, and update task state deterministically.
+
+- **Processing & Retry Orchestration**  
+  Task execution is orchestrated via a dedicated `ProcessingService` that centralizes retry policies, exponential backoff, failure handling, and re-enqueue logic.
+
+- **Security Layer (Spring Security + JWT)**  
+  Authentication and authorization are enforced via a stateless filter chain with access/refresh token rotation, Redis-backed refresh token storage, and role-based access control across all APIs.
+
+- **Observability Layer (Micrometer + Actuator + Prometheus)**  
+  Provides first-class visibility into task throughput, processing latency, retries, failures, queue depth, JVM health, database connections, and Redis availability.
+
+- **Presentation Layer (React + TypeScript Dashboard)**  
+  A lightweight UI for interacting with the system, visualizing queue state, and monitoring backend health.
+
+All components are containerized using Docker and designed to run identically in local, CI, and cloud environments.
+
+# TO-DO: INSERT MERMAID DIAGRAM HERE!!!
+
+
+
+
+```
+flowchart LR
+    Client[Client<br/>(React Dashboard / API Clients)]
+
+    subgraph API[Spring Boot Application]
+        Auth[Spring Security<br/>JWT + RBAC]
+        GQL[GraphQL API]
+        REST[REST API]
+
+        Core[Queue & Processing Core]
+    end
+
+    subgraph Core
+        TS[TaskService]
+        QS[QueueService]
+        PS[ProcessingService]
+        H[TaskHandlers]
+    end
+
+    DB[(PostgreSQL)]
+    Redis[(Redis)]
+    Metrics[(Micrometer / Prometheus)]
+
+    Client -->|HTTP + JWT| Auth
+    Auth --> GQL
+    Auth --> REST
+
+    GQL --> TS
+    REST --> TS
+
+    TS --> DB
+    TS --> QS
+
+    QS --> PS
+    PS --> DB
+    PS --> Redis
+    PS --> H
+
+    API --> Metrics
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+## Key Features (old)
 
 ### 1. Persistent, Strongly-Typed Task Model
 
@@ -493,6 +582,9 @@ Testing approach:
 
 ---
 
+
+
+
 ## Architecture Design
 
 ### High-Level Component Diagram
@@ -746,3 +838,139 @@ The React dashboard uses these operations behind the scenes to:
      * Fire bursts of task create requests.
      * Observe processing latency and retry behavior.
      * Validate system under quasi-real load.
+
+
+
+
+### Project Structure
+```
+src
+├── main
+│  ├── java
+│  │  └── com
+│  │     └── springqprobackend
+│  │        └── springqpro
+│  │           ├── config
+│  │           │  ├── ExecutorConfig.java
+│  │           │  ├── GlobalExceptionHandler.java
+│  │           │  ├── ProcessingMetricsConfig.java
+│  │           │  ├── QueueProperties.java
+│  │           │  ├── RedisConfig.java
+│  │           │  ├── SecurityConfig.java
+│  │           │  └── TaskHandlerProperties.java
+│  │           ├── controller
+│  │           │  ├── auth
+│  │           │  │  └── AuthenticationController.java
+│  │           │  ├── graphql
+│  │           │  │  ├── GraphiQLRedirectController.java
+│  │           │  │  └── TaskGraphQLController.java
+│  │           │  ├── rest
+│  │           │  │  ├── ProcessingEventsController.java
+│  │           │  │  ├── ProducerController.java
+│  │           │  │  ├── SystemHealthController.java
+│  │           │  │  └── TaskRestController.java
+│  │           │  └── controllerRecords.java
+│  │           ├── domain
+│  │           │  ├── entity
+│  │           │  │  ├── TaskEntity.java
+│  │           │  │  └── UserEntity.java
+│  │           │  ├── event
+│  │           │  │  └── TaskCreatedEvent.java
+│  │           │  └── exception
+│  │           │     └── TaskProcessingException.java
+│  │           ├── enums
+│  │           │  ├── TaskStatus.java
+│  │           │  └── TaskType.java
+│  │           ├── handlers
+│  │           │  ├── DataCleanUpHandler.java
+│  │           │  ├── DefaultHandler.java
+│  │           │  ├── EmailHandler.java
+│  │           │  ├── FailAbsHandler.java
+│  │           │  ├── FailHandler.java
+│  │           │  ├── NewsLetterHandler.java
+│  │           │  ├── ReportHandler.java
+│  │           │  ├── SmsHandler.java
+│  │           │  ├── TakesLongHandler.java
+│  │           │  └── TaskHandler.java
+│  │           ├── listeners
+│  │           │  └── TaskCreatedListener.java
+│  │           ├── mapper
+│  │           │  └── TaskMapper.java
+│  │           ├── models
+│  │           │  ├── Task.java
+│  │           │  └── TaskHandlerRegistry.java
+│  │           ├── redis
+│  │           │  ├── RedisDistributedLock.java
+│  │           │  ├── RedisTokenStore.java
+│  │           │  ├── Redis_Lua_Note.md
+│  │           │  └── TaskRedisRepository.java
+│  │           ├── repository
+│  │           │  ├── TaskRepository.java
+│  │           │  └── UserRepository.java
+│  │           ├── runtime
+│  │           │  └── Worker.java
+│  │           ├── security
+│  │           │  ├── dto
+│  │           │  │  ├── AuthRequest.java
+│  │           │  │  ├── AuthResponse.java
+│  │           │  │  ├── LoginRequest.java
+│  │           │  │  ├── RefreshRequest.java
+│  │           │  │  └── RegisterRequest.java
+│  │           │  ├── CustomUserDetailsService.java
+│  │           │  ├── JwtAuthenticationFilter.java
+│  │           │  ├── JwtUtil.java
+│  │           │  └── RefreshTokenService.java
+│  │           ├── service
+│  │           │  ├── ProcessingService.java
+│  │           │  ├── QueueService.java
+│  │           │  └── TaskService.java
+│  │           ├── util
+│  │           │  ├── RealSleeper.java
+│  │           │  └── Sleeper.java
+│  │           └── SpringQueueProApplication.java
+│  └── resources
+│     ├── graphql
+│     │  └── schema.graphqls
+│     ├── static
+│     │  └── graphiql
+│     │     └── index.html
+│     ├── templates
+│     ├── application-prod.yml
+│     ├── application.properties
+│     └── application.yml
+└── test
+   ├── java
+   │  └── com
+   │     └── springqprobackend
+   │        └── springqpro
+   │           ├── config
+   │           │  └── RedisTestConfig.java
+   │           ├── handlers
+   │           │  ├── DefaultHandlerTests.java
+   │           │  └── FailHandlerTests.java
+   │           ├── integration
+   │           │  ├── AuthJwtIntegrationTest.java
+   │           │  ├── CreateAndProcessTaskIntegrationTest.java
+   │           │  ├── OwnershipGraphQLIntegrationTest.java
+   │           │  ├── ProcessingConcurrencyIntegrationTest.java
+   │           │  ├── RedisDistributedLockIntegrationTest.java
+   │           │  ├── RedisPingIntegrationTest.java
+   │           │  ├── RetryBehaviorIntegrationTest.java
+   │           │  ├── TaskCacheIntegrationTest.java
+   │           │  └── TaskGraphQLIntegrationTest.java
+   │           ├── models
+   │           │  └── TaskHandlerRegistryTests.java
+   │           ├── runtime
+   │           │  └── WorkerTests.java
+   │           ├── service
+   │           │  └── QueueServiceTests.java
+   │           ├── testcontainers
+   │           │  ├── BasePostgresContainer.java
+   │           │  ├── BaseRedisContainer.java
+   │           │  ├── IntegrationTestBase.java
+   │           │  └── RedisIntegrationTestBase.java
+   │           └── SpringQueueProApplicationTests.java
+   └── resources
+      ├── application-test.properties
+      └── application-test.yml
+```
