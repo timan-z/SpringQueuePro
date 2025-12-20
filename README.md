@@ -7,6 +7,22 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Key Features](#key-features)
+- [System Architecture (Conceptual)](#system-architecture-conceptual)
+- [System Architecture (Mermaid Diagram)](#high-level-system-architecture-diagram-mermaid)
+- [Core Execution Flow (Task Lifecycle)](#core-execution-flow)
+- [Internal Design and Implementation Details](#internal-design--implementation-details)
+- [Internal Design, etc - 1. The Task Model](#1-persistent-strongly-typed-task-model) 
+- [Internal Design, etc - 2. QueueService and ProcessingService](#2-queueservice--processingservice-worker-architecture)
+- [Internal Design, etc - 3. Redis Coordination and Locking](#3-redis-backed-distributed-coordination--locking)
+- [Internal Design, etc - 4. Automatic Retries w/ Exponential Backoff](#4-automatic-retries-with-exponential-backoff)
+- [Internal Design, etc - 5. Task Management GraphQL API](#5-graphql-api-for-task-management)
+- [Internal Design, etc - 6. JWT Authentication, Refresh Tokens, RBAC](#6-jwt-authentication-refresh-tokens--role-based-access-control)
+- [Internal Design, etc - 7. Metrics, Actuator & Prometheus](#7-metrics-actuator--prometheus)
+- [Internal Design, etc - 8. Testability & CI](#8-testability--ci)
+- [Internal Design, etc - 9. Testing Strategies](#testing-strategy-recommended)
+- [Docker & Containerization](#docker--containerization)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
 
 ## Overview
 
@@ -63,7 +79,6 @@ At a high level, the SpringQueuePro system is comprised of:
 All components are containerized using Docker and designed to run identically in local, CI, and cloud environments.
 
 ## High-Level System Architecture Diagram (Mermaid):
-
 ```mermaid
 flowchart LR
     Client["Client\n(React Dashboard / API Clients)"]
@@ -72,11 +87,10 @@ flowchart LR
         Auth["Spring Security\nJWT + RBAC"]
         GQL[GraphQL API]
         REST[REST API]
-
         CoreNode[Queue & Processing Core]
     end
 
-    subgraph ProcessingCore
+    subgraph ProcessingCore["Processing Core"]
         TS[TaskService]
         QS[QueueService]
         PS[ProcessingService]
@@ -101,6 +115,11 @@ flowchart LR
     PS --> DB
     PS --> Redis
     PS --> H
+
+    CoreNode --> TS
+    CoreNode --> QS
+    CoreNode --> PS
+    CoreNode --> H
 
     API --> Metrics
 ```
@@ -752,7 +771,7 @@ type Mutation {
   deleteTask(id: ID!): Boolean!
 }
 ```
-
+---
 ### GraphQL Controller
 
 The schema is backed by a dedicated Spring GraphQL controller:
@@ -866,6 +885,89 @@ The `/graphql` endpoint is fully protected by the Spring Security filter chain:
 - Role-based authorization can be enforced at the resolver or service level if needed
 
 This ensures GraphQL is **not a bypass** around security — it is a first-class, secured API surface.
+
+---
+
+## GraphQL Usage Examples
+
+**Create a task:**
+
+```graphql
+mutation CreateEmailTask {
+  createTask(input: { payload: "Send welcome email", type: EMAIL }) {
+    id
+    status
+    attempts
+    createdAt
+  }
+}
+```
+
+**Query tasks by status:**
+
+```graphql
+query QueuedTasks {
+  tasks(status: QUEUED) {
+    id
+    type
+    status
+    attempts
+  }
+}
+```
+
+**Update task status (if needed from API side):**
+
+```graphql
+mutation UpdateTaskStatus {
+  updateTask(input: { id: "Task-123", status: FAILED }) {
+    id
+    status
+    attempts
+  }
+}
+```
+
+The React dashboard uses these operations behind the scenes to:
+
+* Authenticate the user and attach tokens.
+* Create tasks of different types.
+* Poll or query for recent tasks and their statuses.
+* Display queue health and summary metrics.
+
+### (Mermaid Diagram) Flow: GraphQL Mutation to Worker Execution
+
+#### Sequence: Create & Process Task
+
+```mermaid
+sequenceDiagram
+    participant UI as React Dashboard
+    participant GQL as /graphql (Spring GraphQL)
+    participant TS as TaskService
+    participant DB as PostgreSQL
+    participant QS as QueueService
+    participant Exec as ExecutorService
+    participant PS as ProcessingService
+    participant R as Redis
+
+    UI->>GQL: mutation createTask(input)
+    GQL->>TS: createTask(payload, type)
+    TS->>DB: INSERT TaskEntity (QUEUED, attempts=0)
+    TS->>QS: enqueueById(taskId)
+    QS->>Exec: submit(taskId)
+    Exec->>PS: claimAndProcess(taskId)
+    PS->>R: tryLock("task:taskId")
+    R-->>PS: lock token
+    PS->>DB: SELECT + atomic transition QUEUED->INPROGRESS
+    PS->>Handlers: handler.handle(Task)
+    alt success
+        PS->>DB: UPDATE status=COMPLETED
+    else failure
+        PS->>DB: UPDATE status=FAILED
+        PS->>QS: schedule retry (backoff)
+    end
+    PS->>R: unlock("task:taskId", token)
+```
 
 ---
 
@@ -1008,6 +1110,8 @@ This design allows:
 - Token revocation without session tracking
 - Safe scaling across multiple JVMs or containers
 
+---
+
 ### Mermaid Diagram of the Whole Authentication System
 
 ```mermaid
@@ -1032,37 +1136,44 @@ sequenceDiagram
     AuthAPI-->>Client: New access token
 ```
 
+### Mermaid Diagram Sequence of a Protected Request
 
+```mermaid
+sequenceDiagram
+    participant UI as React / Postman
+    participant Sec as Spring Security Filter Chain
+    participant JWT as JwtAuthenticationFilter + JwtUtil
+    participant URepo as UserRepository
+    participant Ctrl as GraphQL / REST Controller
 
+    UI->>Sec: HTTP request + Authorization: Bearer <accessToken>
+    Sec->>JWT: pass request
+    JWT->>JWT: validate signature + expiry
+    JWT->>URepo: load user by email from token
+    URepo-->>JWT: UserEntity
+    JWT->>Sec: attach Authentication (UserDetails + roles)
+    Sec->>Ctrl: invoke controller w/ SecurityContext
+    Ctrl-->>UI: protected response
+```
 
+### Mermaid Diagram Sequence of Refresh Token Rotation
 
+```mermaid
+sequenceDiagram
+    participant UI as Client
+    participant Auth as /auth/refresh
+    participant RTS as RefreshTokenService
+    participant Redis as RedisTokenStore
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# REFACTORING README STOPS HERE!!!
-
-
-
+    UI->>Auth: POST /auth/refresh { refreshToken }
+    Auth->>RTS: validateAndRotate(refreshToken)
+    RTS->>Redis: lookup refresh token
+    Redis-->>RTS: token data (user, valid?)
+    RTS->>Redis: invalidate old token
+    RTS->>Redis: store new refresh token
+    RTS-->>Auth: new access + refresh tokens
+    Auth-->>UI: { accessToken, refreshToken }
+```
 
 ---
 
@@ -1095,9 +1206,11 @@ Exposed through:
 * `GET /actuator/metrics` – JSON endpoint for individual metrics.
 * `GET /actuator/prometheus` – Prometheus scrape endpoint with all metrics.
 
-This allows easy integration with Prometheus + soon-to-come Grafana dashboards.
+This allows easy integration with Prometheus + **soon-to-come** Grafana dashboards (*leaving this section intentionally short since these metrics were intended for a larger Grafana section*).
 
 ---
+
+# DON'T FORGET TO RETURN TO AND REVISE SECTION 8 AFTER I FIX MY INTEGRATION TESTS!!!
 
 ### 8. Testability & CI
 
@@ -1125,6 +1238,221 @@ Testing approach:
   * Uses Maven build with tests.
   * Leverages Testcontainers to spin up real Postgres/Redis inside GitHub runners.
   * Ensures that every commit keeps your queue engine, persistence, Redis integration, and security workflow intact.
+
+---
+
+## Testing Strategy (Recommended)
+
+1. **Unit Tests**
+
+   * `QueueServiceTests`
+
+     * Enqueueing tasks.
+     * Clearing the queue.
+     * Deleting tasks.
+   * `ProcessingServiceTests` (with mocks for TaskRepository, RedisDistributedLock, TaskHandlerRegistry)
+
+     * Successful claim and process flow.
+     * Failure flow + retry scheduling.
+     * Lock acquisition failure.
+   * Handler tests (`EmailHandlerTests`, `FailHandlerTests`, etc.)
+
+     * Correct behavior per handler type.
+   * Security helpers (`JwtUtilTests`)
+
+     * Token generation, parsing, expiry behavior.
+   * Mapper tests (`TaskMapperTests`).
+
+2. **Integration Tests (Testcontainers)**
+
+   * **Postgres integration**
+
+     * `TaskRepositoryIntegrationTest`
+     * `TaskServiceIntegrationTest` for CRUD + persistence flows.
+   * **Redis integration**
+
+     * `RedisDistributedLockIntegrationTest`
+     * `TaskCacheIntegrationTest`
+     * `RedisPingIntegrationTest`
+   * **JWT + Security**
+
+     * `AuthenticationFlowIntegrationTest`:
+
+       * `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`.
+       * Accessing `/graphql` and `/api/**` with/without tokens.
+   * **GraphQL Controller**
+
+     * `TaskGraphQLIntegrationTest`:
+
+       * Create task → verify persisted in DB.
+       * Query tasks by status.
+       * Delete task and verify.
+
+3. **Smoke / E2E Tests (Future)**
+
+   * Use Postman collections, k6, or JMeter to:
+
+     * Fire bursts of task create requests.
+     * Observe processing latency and retry behavior.
+     * Validate system under quasi-real load.
+
+---
+
+## Docker & Containerization
+
+SpringQueuePro is fully containerized and designed to run **identically across local development, CI, and cloud environments**.
+
+### Multi-Stage Docker Build
+
+The backend uses a **multi-stage Dockerfile** to produce a minimal, production-grade runtime image:
+
+* **Stage 1 (Build)**
+  Uses a Maven + JDK 21 image to compile the Spring Boot application and produce a fat JAR.
+* **Stage 2 (Runtime)**
+  Uses a slim JRE-only image (`eclipse-temurin:21-jre`) to reduce attack surface and image size.
+
+Key benefits:
+
+* Faster CI builds via dependency layer caching
+* Smaller final images (~60–70% reduction vs single-stage)
+* Clear separation between build and runtime concerns
+* Compatible with AWS ECS, EKS, and container registries (ECR)
+
+```dockerfile
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn -q -B dependency:go-offline
+COPY src ./src
+RUN mvn -q -B clean package -DskipTests
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+ENV JAVA_OPTS=""
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+```
+
+---
+
+### Docker Compose (Local & Observability)
+
+SpringQueuePro ships with **multiple Docker Compose configurations** depending on use case:
+
+#### 1. Core Local Stack
+
+Runs the essential system components:
+
+* SpringQueuePro backend
+* PostgreSQL (task persistence)
+* Redis (distributed locks, refresh tokens, caching)
+
+```bash
+docker compose up
+```
+
+This configuration mirrors production service dependencies while remaining lightweight for local development.
+
+#### 2. Observability Stack (Optional)
+
+An extended compose file adds:
+
+* Prometheus (metrics scraping)
+* Grafana (dashboard visualization)
+
+```bash
+docker compose -f docker-compose.observability.yml up
+```
+
+This allows developers to observe:
+
+* Task throughput
+* Retry rates
+* Processing latency
+* Queue depth
+* JVM and database health
+
+without modifying application code.
+
+---
+
+### Container Networking & Configuration
+
+All services communicate using **Docker DNS service names** (e.g., `db`, `redis`) rather than hardcoded IPs.
+
+Configuration is injected via **environment variables**, making the system:
+
+* Cloud-portable
+* CI-friendly
+* Compatible with AWS ECS task definitions and secrets managers
+
+```yaml
+SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/springqpro
+REDIS_HOST=redis
+SPRING_PROFILES_ACTIVE=production
+```
+---
+
+## Production Deployment Notes
+
+SpringQueuePro is architected to transition cleanly from local Docker Compose to **cloud-native container orchestration**.
+
+### AWS / ECS Readiness
+
+The current design maps naturally to AWS ECS or EKS (*incoming **CloudQueue** project, see "Next Steps"*):
+
+| Component          | AWS Equivalent            |
+| ------------------ | ------------------------- |
+| SpringQueuePro App | ECS Service / Task        |
+| PostgreSQL         | RDS                       |
+| Redis              | ElastiCache               |
+| Docker Images      | Amazon ECR                |
+| Metrics            | CloudWatch / Prometheus   |
+| Secrets            | AWS Secrets Manager / SSM |
+
+Key production considerations already addressed:
+
+* **Stateless application design**
+  All state is externalized (Postgres + Redis), allowing horizontal scaling.
+* **Graceful concurrency handling**
+  Redis locks + DB state transitions prevent duplicate task execution even with multiple running containers.
+* **Observability-first design**
+  Micrometer metrics integrate cleanly with Prometheus or CloudWatch.
+* **Security-ready**
+  JWT authentication, refresh token rotation, and Redis-backed revocation work across multiple instances.
+
+### Scaling Model
+
+In production:
+
+* Multiple SpringQueuePro containers can run concurrently
+* Each container acts as an independent worker pool
+* Redis ensures **distributed coordination**
+* PostgreSQL ensures **durable, authoritative state**
+
+This enables:
+
+* Horizontal scaling under load
+* Safe task processing across nodes
+* No reliance on sticky sessions or in-memory state
+
+### CI/CD Compatibility
+
+The containerized build integrates cleanly with CI pipelines:
+
+* GitHub Actions builds and tests the image
+* Testcontainers validate behavior against real Postgres + Redis
+* The same image can be promoted from CI → staging → production
+
+### Summary
+
+SpringQueuePro’s Docker setup is **production-oriented containerization** designed for:
+* Real orchestration platforms
+* Real distributed concurrency
+* Real observability and security requirements
+
+This foundation makes the transition to **CloudQueue (AWS-hosted evolution)** a matter of infrastructure wiring — not architectural rework.
 
 ---
 ## Tech Stack
@@ -1187,253 +1515,7 @@ Testing approach:
 
 ---
 
-## Architecture Design
-
-### High-Level Component Diagram
-
-```mermaid
-flowchart LR
-    subgraph ClientSide[Client Side]
-        UI[React / Netlify Dashboard]
-    end
-
-    subgraph APILayer[Spring Boot API Layer]
-        GQL[GraphQL Endpoint /graphql]
-        REST[REST Controllers /api, /auth]
-        Sec[Spring Security Filter Chain<br/>+ JwtAuthenticationFilter]
-    end
-
-    subgraph Core[Core Queue & Processing]
-        TSvc[TaskService<br/>(create/query tasks)]
-        QSvc[QueueService<br/>(enqueueById)]
-        Proc[ProcessingService<br/>(claim + process + retry)]
-        HReg[TaskHandlerRegistry]
-        Handlers[Handlers<br/>(Email, Report, Fail, etc.)]
-    end
-
-    subgraph Infra[Infrastructure]
-        DB[(PostgreSQL<br/>TaskRepository)]
-        Redis[(Redis<br/>Locks + Tokens)]
-        Metrics[Micrometer + Actuator<br/>/actuator/prometheus]
-    end
-
-    UI -->|HTTP + JWT| Sec
-    Sec --> GQL
-    Sec --> REST
-
-    GQL --> TSvc
-    REST --> TSvc
-
-    TSvc --> DB
-    TSvc --> QSvc
-
-    QSvc --> Proc
-    Proc --> DB
-    Proc --> Redis
-    Proc --> HReg
-    HReg --> Handlers
-
-    Core --> Metrics
-    APILayer --> Metrics
-```
-
----
-
-
-
-
-
-
-
----
-
-## Flow: From GraphQL Mutation to Worker Execution
-
-### Sequence: Create & Process Task
-
-```mermaid
-sequenceDiagram
-    participant UI as React Dashboard
-    participant GQL as /graphql (Spring GraphQL)
-    participant TS as TaskService
-    participant DB as PostgreSQL
-    participant QS as QueueService
-    participant Exec as ExecutorService
-    participant PS as ProcessingService
-    participant R as Redis
-
-    UI->>GQL: mutation createTask(input)
-    GQL->>TS: createTask(payload, type)
-    TS->>DB: INSERT TaskEntity (QUEUED, attempts=0)
-    TS->>QS: enqueueById(taskId)
-    QS->>Exec: submit(taskId)
-    Exec->>PS: claimAndProcess(taskId)
-    PS->>R: tryLock("task:taskId")
-    R-->>PS: lock token
-    PS->>DB: SELECT + atomic transition QUEUED->INPROGRESS
-    PS->>Handlers: handler.handle(Task)
-    alt success
-        PS->>DB: UPDATE status=COMPLETED
-    else failure
-        PS->>DB: UPDATE status=FAILED
-        PS->>QS: schedule retry (backoff)
-    end
-    PS->>R: unlock("task:taskId", token)
-```
-
----
-
-## Security & JWT / RBAC Flow
-
-### Sequence: Protected Request
-
-```mermaid
-sequenceDiagram
-    participant UI as React / Postman
-    participant Sec as Spring Security Filter Chain
-    participant JWT as JwtAuthenticationFilter + JwtUtil
-    participant URepo as UserRepository
-    participant Ctrl as GraphQL / REST Controller
-
-    UI->>Sec: HTTP request + Authorization: Bearer <accessToken>
-    Sec->>JWT: pass request
-    JWT->>JWT: validate signature + expiry
-    JWT->>URepo: load user by email from token
-    URepo-->>JWT: UserEntity
-    JWT->>Sec: attach Authentication (UserDetails + roles)
-    Sec->>Ctrl: invoke controller w/ SecurityContext
-    Ctrl-->>UI: protected response
-```
-
-### Sequence: Refresh Token Rotation
-
-```mermaid
-sequenceDiagram
-    participant UI as Client
-    participant Auth as /auth/refresh
-    participant RTS as RefreshTokenService
-    participant Redis as RedisTokenStore
-
-    UI->>Auth: POST /auth/refresh { refreshToken }
-    Auth->>RTS: validateAndRotate(refreshToken)
-    RTS->>Redis: lookup refresh token
-    Redis-->>RTS: token data (user, valid?)
-    RTS->>Redis: invalidate old token
-    RTS->>Redis: store new refresh token
-    RTS-->>Auth: new access + refresh tokens
-    Auth-->>UI: { accessToken, refreshToken }
-```
-
----
-
-## GraphQL Usage Examples
-
-**Create a task:**
-
-```graphql
-mutation CreateEmailTask {
-  createTask(input: { payload: "Send welcome email", type: EMAIL }) {
-    id
-    status
-    attempts
-    createdAt
-  }
-}
-```
-
-**Query tasks by status:**
-
-```graphql
-query QueuedTasks {
-  tasks(status: QUEUED) {
-    id
-    type
-    status
-    attempts
-  }
-}
-```
-
-**Update task status (if needed from API side):**
-
-```graphql
-mutation UpdateTaskStatus {
-  updateTask(input: { id: "Task-123", status: FAILED }) {
-    id
-    status
-    attempts
-  }
-}
-```
-
-The React dashboard uses these operations behind the scenes to:
-
-* Authenticate the user and attach tokens.
-* Create tasks of different types.
-* Poll or query for recent tasks and their statuses.
-* Display queue health and summary metrics.
-
----
-
-## Testing Strategy (Recommended)
-
-1. **Unit Tests**
-
-   * `QueueServiceTests`
-
-     * Enqueueing tasks.
-     * Clearing the queue.
-     * Deleting tasks.
-   * `ProcessingServiceTests` (with mocks for TaskRepository, RedisDistributedLock, TaskHandlerRegistry)
-
-     * Successful claim and process flow.
-     * Failure flow + retry scheduling.
-     * Lock acquisition failure.
-   * Handler tests (`EmailHandlerTests`, `FailHandlerTests`, etc.)
-
-     * Correct behavior per handler type.
-   * Security helpers (`JwtUtilTests`)
-
-     * Token generation, parsing, expiry behavior.
-   * Mapper tests (`TaskMapperTests`).
-
-2. **Integration Tests (Testcontainers)**
-
-   * **Postgres integration**
-
-     * `TaskRepositoryIntegrationTest`
-     * `TaskServiceIntegrationTest` for CRUD + persistence flows.
-   * **Redis integration**
-
-     * `RedisDistributedLockIntegrationTest`
-     * `TaskCacheIntegrationTest`
-     * `RedisPingIntegrationTest`
-   * **JWT + Security**
-
-     * `AuthenticationFlowIntegrationTest`:
-
-       * `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`.
-       * Accessing `/graphql` and `/api/**` with/without tokens.
-   * **GraphQL Controller**
-
-     * `TaskGraphQLIntegrationTest`:
-
-       * Create task → verify persisted in DB.
-       * Query tasks by status.
-       * Delete task and verify.
-
-3. **Smoke / E2E Tests (Future)**
-
-   * Use Postman collections, k6, or JMeter to:
-
-     * Fire bursts of task create requests.
-     * Observe processing latency and retry behavior.
-     * Validate system under quasi-real load.
-
-
-
-
-### Project Structure
+## Project Structure
 ```
 src
 ├── main
@@ -1565,3 +1647,81 @@ src
       ├── application-test.properties
       └── application-test.yml
 ```
+
+## Limitations & Deferred Work
+
+SpringQueuePro was developed as a **time-boxed MVP** to demonstrate core distributed systems concepts with a strong emphasis on **correctness, reliability, and architectural clarity**.
+
+Granted, I went well overtime. I started this project at the start of November and thought I was capable of finishing it within 2 weeks (*working with most of these technologies for the very first time*) but it took the full month. My deadline was to have something production-ready and deployable by the end of November, and so a small number of production-oriented features were **deliberately deferred** in order to meet this deadline but also prioritize:
+- End-to-end correctness of task execution
+- Deterministic retry and failure semantics
+- Secure multi-user authentication and authorization
+- Clean service boundaries and observability hooks
+
+### Deferred / Partial Implementations
+
+- **Grafana Dashboards**
+  - Prometheus metrics are fully exposed and validated via `/actuator/prometheus`.
+  - Several dashboards were prototyped locally, but a polished, recruiter-facing Grafana dashboard was deferred to avoid rushed or misleading visualizations.
+  - The metrics surface is stable and intentionally designed for future dashboard expansion.
+
+- **Load / Stress Testing (k6 / JMeter)**
+  - Integration tests validate correctness under concurrency using real Postgres and Redis via Testcontainers.
+  - Dedicated load testing (high-throughput task submission, soak tests, and spike tests) was planned but postponed to a follow-up phase.
+  - This was a conscious decision to avoid conflating correctness validation with performance tuning in the MVP.
+
+These features are tracked as **explicit follow-up work** and form part of the next evolution of the system.
+
+---
+
+## Future Steps & CloudQueue
+
+SpringQueuePro is designed as a **foundation project**, not a terminal system. Its architecture intentionally mirrors real-world distributed task queues so that future iterations can focus on **infrastructure evolution rather than redesign**.
+
+### Short-Term Follow-Up (SpringQueuePro)
+
+Planned enhancements to be added incrementally:
+
+- **Grafana Dashboards**
+  - Task throughput, retries, failures, and queue depth
+  - Processing latency histograms
+  - Redis lock contention and DB pool utilization
+- **Load Testing**
+  - k6-based workload simulations for:
+    - Burst traffic
+    - Sustained throughput (soak testing)
+    - Failure-heavy retry scenarios
+- **Minor UX Improvements**
+  - Refinements to the existing React dashboard
+  - Additional task filtering and status visualization
+  - **Make no mistake**: the React UI is still 100% *cosmetic* and ancillarly to the core project
+
+These enhancements build directly on the existing metrics and APIs without requiring backend architectural changes.
+
+---
+
+### CloudQueue — AWS-Native Evolution
+
+**CloudQueue** is the planned AWS-native evolution of SpringQueuePro and will be developed as a **separate but conceptually related project**.
+
+While SpringQueuePro focuses on *in-process workers with distributed coordination*, CloudQueue will explore **managed cloud primitives and serverless execution models**, including:
+
+- **Task ingestion via AWS SQS**
+- **Execution using AWS Lambda workers**
+- **State persistence in DynamoDB or Aurora**
+- **Secrets and configuration via AWS IAM + Parameter Store**
+- **Observability via CloudWatch + Managed Prometheus**
+- **Infrastructure defined using IaC (Terraform / CDK)**
+
+SpringQueuePro’s stateless design, Redis/Postgres separation, and JWT-based security model were all chosen to make this transition natural.
+
+CloudQueue will serve as:
+- A deeper exploration of cloud-native distributed systems
+- A practical companion to AWS certification study
+- A comparison point between self-managed queues and managed cloud services
+
+Together, SpringQueuePro and CloudQueue represent **two ends of the same architectural spectrum**:
+- One focused on *explicit control and correctness*
+- The other on *cloud-managed scalability and operational tradeoffs*
+
+**NOTE**: I was crazy enough to think that I could get both SpringQueuePro and CloudQueue finished within a month. I do have prior experience from university working with AWS, primarily under the context of using Boto3 — AWS' Python SDK — to manipulate buckets and provision system resources based on `.config` files, so perhaps I was naive. In the upcoming months I plan on achieving the AWS Solutions Architect and Cloud Practitioner certifications. Perhaps I'll build CloudQueue in parallel as I prepare for those exams.
