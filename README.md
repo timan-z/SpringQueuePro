@@ -23,6 +23,8 @@
 - [Docker & Containerization](#docker--containerization)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
+- [Limitations & Deferred Work](#limitations--deferred-work)
+- [Future Steps & CloudQueue](#future-steps--cloudqueue)
 
 ## Overview
 
@@ -1724,4 +1726,4 @@ Together, SpringQueuePro and CloudQueue represent **two ends of the same archite
 - One focused on *explicit control and correctness*
 - The other on *cloud-managed scalability and operational tradeoffs*
 
-**NOTE**: I was crazy enough to think that I could get both SpringQueuePro and CloudQueue finished within a month. I do have prior experience from university working with AWS, primarily under the context of using Boto3 — AWS' Python SDK — to manipulate buckets and provision system resources based on `.config` files, so perhaps I was naive. In the upcoming months I plan on achieving the AWS Solutions Architect and Cloud Practitioner certifications. Perhaps I'll build CloudQueue in parallel as I prepare for those exams.
+**NOTE**: I was crazy enough to think that I could get both SpringQueuePro and CloudQueue finished within a month. I do have prior experience from university working with AWS, primarily under the context of using Boto3 — AWS' Python SDK — to manipulate buckets and provision system resources based on `.config` files, so perhaps I got a little naive. In the upcoming months I plan on achieving the AWS Solutions Architect and Cloud Practitioner certifications. Maybe I'll build CloudQueue in parallel as I prepare for those exams.
