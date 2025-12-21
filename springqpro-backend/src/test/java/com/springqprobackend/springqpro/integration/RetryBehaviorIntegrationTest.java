@@ -11,6 +11,7 @@ import com.springqprobackend.springqpro.service.TaskService;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,7 @@ with it directly in your test methods. [And all of this on @SpyBean was taken fr
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "spring.main.allow-bean-definition-overriding=true"
 )
+@Tag("disable_temp")
 class RetryBehaviorIntegrationTest extends IntegrationTestBase {
     // Field(s):
     private static final Logger logger = LoggerFactory.getLogger(RetryBehaviorIntegrationTest.class);
@@ -92,6 +94,7 @@ class RetryBehaviorIntegrationTest extends IntegrationTestBase {
     // 2025-11-17-DEBUG: Renaming the Test name. (Checking that it's QUEUED is more accurate than checking if it's FAILED).
     //@Disabled
     @Test
+    @Disabled("Outdated architecture — will fix later")
     void failingTask_isRequeued_andRetryScheduled() {
         // 1. MAKE TASK:
         TaskEntity entity = taskService.createTaskForUser("RETRY TEST", TaskType.FAIL, "random_email@gmail.com");

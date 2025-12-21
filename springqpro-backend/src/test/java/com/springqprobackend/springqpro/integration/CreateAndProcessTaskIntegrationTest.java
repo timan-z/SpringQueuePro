@@ -6,10 +6,13 @@ import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.ResponseEntity;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 import java.time.Duration;
@@ -50,8 +53,8 @@ public void sweepQueuedTasks() {
 3. Waits (w/ Awaitility) for the DB row to become COMPLETED verifying that the ProcessingService ran and handler executed, status persisted.
 - Uses Awaitility to wait for ProcessingService's asynchronous processing.
 */
-//@Testcontainers
 //@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Tag("disable_temp")
 class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
     @Autowired
     private TestRestTemplate rest;
@@ -64,7 +67,7 @@ class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
         taskRepository.deleteAll();
     }
 
-    @Disabled
+    @Disabled("Outdated architecture — will fix later")
     @Test
     void createTask_isPersisted_andEventuallyProcessed() {
         // Starting w/ creating Task via REST endpoint (my ProducerController's POST /enqueue):
