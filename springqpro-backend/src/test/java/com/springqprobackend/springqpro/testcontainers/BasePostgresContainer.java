@@ -16,15 +16,16 @@ TO FIX THIS AND MAKE IT MORE PROFESSIONALLY TIDY AFTER I GET MY CORE PROJECT DON
 */
 // CENTRAL PostgreSQL Testcontainer USED FOR ALL MY INTEGRATION TESTS:
 public abstract class BasePostgresContainer {
+    /*@Container
     @ServiceConnection
     protected static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>("postgres:18")
                     .withDatabaseName("springqpro")
                     .withUsername("springqpro")
                     .withPassword("springqpro")
-                    .withReuse(true);
+                    .withReuse(true);*/
     // 2025-11-23-DEBUG: TEMP BELOW.
-    @Container
+    /*@Container
     @ServiceConnection
     static final RedisContainer REDIS =
             new RedisContainer(DockerImageName.parse("redis:7.2"));
@@ -33,5 +34,5 @@ public abstract class BasePostgresContainer {
     static {
         POSTGRES.start();   // This is meant to boot once for the entire Integration Test Suite.
         REDIS.start();  // 2025-11-23-DEBUG: TEMP.
-    }
+    }*/
 }

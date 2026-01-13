@@ -7,6 +7,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @DataRedisTest
@@ -17,9 +19,15 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration.class,
         org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration.class
 })
-public abstract class RedisIntegrationTestBase extends BaseRedisContainer {
+public abstract class RedisIntegrationTestBase {
+    @Container
+    static final GenericContainer<?> REDIS =
+            new GenericContainer<>("redis:7-alpine")
+                    .withExposedPorts(6379)
+                    .withReuse(true);
+
     @DynamicPropertySource
-    static void overrideRedisProps(DynamicPropertyRegistry registry) {
+    static void redisProps(DynamicPropertyRegistry registry) {
         registry.add("spring.redis.host", REDIS::getHost);
         registry.add("spring.redis.port", () -> REDIS.getMappedPort(6379));
     }

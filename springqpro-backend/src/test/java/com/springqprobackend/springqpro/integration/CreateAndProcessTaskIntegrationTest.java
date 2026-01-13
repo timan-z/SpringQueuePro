@@ -54,7 +54,7 @@ public void sweepQueuedTasks() {
 - Uses Awaitility to wait for ProcessingService's asynchronous processing.
 */
 //@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Tag("disable_temp")
+//@Tag("disable_temp")
 class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
     @Autowired
     private TestRestTemplate rest;

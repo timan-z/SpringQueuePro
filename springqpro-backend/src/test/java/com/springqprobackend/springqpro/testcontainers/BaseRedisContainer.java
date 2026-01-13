@@ -4,12 +4,12 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.testcontainers.containers.GenericContainer;
 
 public abstract class BaseRedisContainer {
-    @ServiceConnection
+    /*@ServiceConnection
     protected static final GenericContainer<?> REDIS
             = new GenericContainer<>("redis:7-alpine")
             .withExposedPorts(6379)
             .withReuse(true);
     static {
         REDIS.start();
-    }
+    }*/
 }

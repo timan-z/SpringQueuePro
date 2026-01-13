@@ -1,11 +1,12 @@
 package com.springqprobackend.springqpro;
 
+import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class SpringQueueProApplicationTests {
+class SpringQueueProApplicationTests extends IntegrationTestBase {
 
 	@Test
 	void contextLoads() {
