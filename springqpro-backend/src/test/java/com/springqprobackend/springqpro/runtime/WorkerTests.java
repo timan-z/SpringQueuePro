@@ -19,6 +19,7 @@ handler. Writing tests should be relatively simple.
 Again:
 - More on different assert methods: https://www.baeldung.com/junit-assertions
 */
+// commit test
 
 @ExtendWith(MockitoExtension.class)
 public class WorkerTests {
