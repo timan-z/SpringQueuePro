@@ -1,15 +1,9 @@
 package com.springqprobackend.springqpro.integration;
 
-import com.springqprobackend.springqpro.domain.entity.TaskEntity;
-import com.springqprobackend.springqpro.domain.entity.UserEntity;
-import com.springqprobackend.springqpro.enums.TaskStatus;
-import com.springqprobackend.springqpro.enums.TaskType;
-import com.springqprobackend.springqpro.repository.TaskRepository;
-import com.springqprobackend.springqpro.repository.UserRepository;
-import com.springqprobackend.springqpro.security.JwtUtil;
-import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
-import org.junit.jupiter.api.Test;
+import java.time.Instant;
+
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -20,7 +14,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 
-import java.time.Instant;
+import com.springqprobackend.springqpro.domain.entity.TaskEntity;
+import com.springqprobackend.springqpro.domain.entity.UserEntity;
+import com.springqprobackend.springqpro.enums.TaskStatus;
+import com.springqprobackend.springqpro.enums.TaskType;
+import com.springqprobackend.springqpro.repository.TaskRepository;
+import com.springqprobackend.springqpro.repository.UserRepository;
+import com.springqprobackend.springqpro.security.JwtUtil;
+import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 
 /* 2025-11-17-NOTE(S)-TO-SELF:
 - GraphQlTester is Spring's testing utility for GraphQL endpoints.

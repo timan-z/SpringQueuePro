@@ -104,13 +104,12 @@ public class QueueService {
     private final TaskRepository taskRepository;        // DEBUG: For optional direct DB READS.
     private final ProcessingService processingService;  // DEBUG: Do processing via transactional service.
     // DEBUG: 2025-11-26 EDIT: METRICS-RELATED ADDITIONS BELOW!
-    private final Counter queueEnqueueCounter;
+    //private final Counter queueEnqueueCounter;
     private final Counter queueEnqueueByIdCounter;
 
     // Constructor:
     @Autowired  // DEBUG: See if this fixes the issue!
-    public QueueService(TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, @Qualifier("execService") ExecutorService executor, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueProperties props,
-                        Counter queueEnqueueCounter, Counter queueEnqueueByIdCounter) {
+    public QueueService(TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, @Qualifier("execService") ExecutorService executor, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueProperties props, Counter queueEnqueueByIdCounter) {
         //this.jobs = new ConcurrentHashMap<>();
         this.taskRepository = taskRepository;
         this.processingService = processingService;
@@ -119,13 +118,12 @@ public class QueueService {
         this.handlerRegistry = handlerRegistry;
         this.props = props;
         // DEBUG: 2025-11-26 EDIT: METRICS-RELATED ADDITIONS BELOW:
-        this.queueEnqueueCounter = queueEnqueueCounter;
+        //this.queueEnqueueCounter = queueEnqueueCounter;
         this.queueEnqueueByIdCounter = queueEnqueueByIdCounter;
     }
 
     // Constructor 2 (specifically for JUnit+Mockito testing purposes, maybe custom setups too I suppose):
-    public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, QueueProperties props,
-                        Counter queueEnqueueCounter, Counter queueEnqueueByIdCounter){
+    public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, QueueProperties props, Counter queueEnqueueByIdCounter){
         //this.jobs = new ConcurrentHashMap<>();
         this.taskRepository = taskRepository;
         this.processingService = processingService;
@@ -134,7 +132,7 @@ public class QueueService {
         this.handlerRegistry = handlerRegistry;
         this.props = props;
         // DEBUG: 2025-11-26 EDIT: METRICS-RELATED ADDITIONS BELOW:
-        this.queueEnqueueCounter = queueEnqueueCounter;
+        //this.queueEnqueueCounter = queueEnqueueCounter;
         this.queueEnqueueByIdCounter = queueEnqueueByIdCounter;
     }
 
