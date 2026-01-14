@@ -92,18 +92,7 @@ Thread stacks consume ~1MB each by default. Explicitly capping worker and schedu
 
 ---
 
-### 6. Removing Unnecessary Dependencies (pom.xml)
-
-Getting rid of stuff like this that was lying around:
-```xml
-<artifactId>spring-boot-starter-webflux</artifactId>
-<scope>test</scope>
-```
-*For this example specifically*, WebFlux pulls in Reactor and Netty, increasing classpath scanning, memory usage, and startup overhead even when unused.
-
----
-
-### 7. Replace Executor Factories with Explicit ThreadPoolExecutor
+### 6. Replace Executor Factories with Explicit ThreadPoolExecutor
 
 Making this change in `ExecutorConfig.java` (*the original code is what's commented out in the snippet*):
 
@@ -135,7 +124,7 @@ Using an explicit `ThreadPoolExecutor` avoids unbounded task queues, enables bac
 
 ---
 
-### 8. Remove Legacy Metrics
+### 7. Remove Legacy Metrics
 
 Removed counters and gauges tied to deprecated code paths (e.g., legacy in-memory queue metrics). Got rid of stuff like (which relates to outdated, deprecated code):
 ```java
