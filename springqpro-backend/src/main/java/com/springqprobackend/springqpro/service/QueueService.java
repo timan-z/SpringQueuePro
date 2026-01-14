@@ -92,7 +92,7 @@ public class QueueService {
     // Fields:
     private static final Logger logger = LoggerFactory.getLogger(QueueService.class);
     private final ExecutorService executor;
-    private final ConcurrentHashMap<String,Task> jobs;  // NOTE: W/ the ProcessingService.java overhaul, this field is obsolete along with probably some others.
+    //private final ConcurrentHashMap<String,Task> jobs;  // NOTE: W/ the ProcessingService.java overhaul, this field is obsolete along with probably some others.
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
     private final Lock readLock = rwLock.readLock();
     private final Lock writeLock = rwLock.writeLock();
@@ -111,7 +111,7 @@ public class QueueService {
     @Autowired  // DEBUG: See if this fixes the issue!
     public QueueService(TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, @Qualifier("execService") ExecutorService executor, @Qualifier("schedExec") ScheduledExecutorService scheduler, QueueProperties props,
                         Counter queueEnqueueCounter, Counter queueEnqueueByIdCounter) {
-        this.jobs = new ConcurrentHashMap<>();
+        //this.jobs = new ConcurrentHashMap<>();
         this.taskRepository = taskRepository;
         this.processingService = processingService;
         this.executor = executor;
@@ -126,7 +126,7 @@ public class QueueService {
     // Constructor 2 (specifically for JUnit+Mockito testing purposes, maybe custom setups too I suppose):
     public QueueService(ExecutorService executor, TaskHandlerRegistry handlerRegistry, TaskRepository taskRepository, ProcessingService processingService, QueueProperties props,
                         Counter queueEnqueueCounter, Counter queueEnqueueByIdCounter){
-        this.jobs = new ConcurrentHashMap<>();
+        //this.jobs = new ConcurrentHashMap<>();
         this.taskRepository = taskRepository;
         this.processingService = processingService;
         this.executor = executor;
@@ -159,7 +159,7 @@ public class QueueService {
     // OLD Methods:
     // 1. Translating GoQueue's "func (q * Queue) Enqueue(t task.Task) {...}" function:
     // EDIT: THE VERSION OF enqueue BELOW IS NOW LEGACY CODE FROM THE PROTOTYPE PHASE! enqueueById ABOVE WILL BE USED BY ProcessingService.java.
-    @Deprecated
+    /*@Deprecated
     public void enqueue(Task t) {
         t.setStatus(TaskStatus.QUEUED);
         queueEnqueueCounter.increment();
@@ -170,11 +170,12 @@ public class QueueService {
         } finally {
             writeLock.unlock();
         }
-    }
+    }*/
+    // 2026-01-13-NOTE: ^ Removed because the jobs field is a memory hog even if it's deprecated and it's racking up my Railway bill.
 
     // 2. Translating GoQueue's "func (q * Queue) Clear() {...}" function:
     // (This is the method for "emptying the queue").
-    @Deprecated
+    /*@Deprecated
     public void clear() {
         writeLock.lock();
         try {
@@ -182,11 +183,12 @@ public class QueueService {
         } finally {
             writeLock.unlock();
         }
-    }
+    }*/
+    // 2026-01-13-NOTE: ^ Removed because the jobs field is a memory hog even if it's deprecated and it's racking up my Railway bill.
 
     // 3. Translating GoQueue's "func (q * Queue) GetJobs() []*task.Task {...}" function:
     // This is the method for returning a copy of all the Jobs (Tasks) we have:
-    @Deprecated
+    /*@Deprecated
     public List<Task> getJobs() {
         readLock.lock();
         try {
@@ -194,14 +196,15 @@ public class QueueService {
         } finally {
             readLock.unlock();
         }
-    }
+    }*/
+    // 2026-01-13-NOTE: ^ Removed because the jobs field is a memory hog even if it's deprecated and it's racking up my Railway bill.
 
     // 5. Translating GoQueue's "func (q * Queue) GetJobByID(id String) (*task.Task, bool)" function:
     // This is the method for returning a specific Job (Task) by ID:
-    @Deprecated
+    /*@Deprecated
     public Task getJobById(String id) {
-        /* In my GoQueue version of this function, I returned a bool and the Task, but the reasons for that
-        were entirely superfluous and I can just return null like a normal human being if Task isn't found. */
+         In my GoQueue version of this function, I returned a bool and the Task, but the reasons for that
+        were entirely superfluous and I can just return null like a normal human being if Task isn't found.
         readLock.lock();
         Task t = null;
         try {
@@ -212,11 +215,12 @@ public class QueueService {
             readLock.unlock();
         }
         return t;
-    }
+    }*/
+    // 2026-01-13-NOTE: ^ Removed because the jobs field is a memory hog even if it's deprecated and it's racking up my Railway bill.
 
     // 6. Translating GoQueue's "func (q * Queue) DeleteJob(id string) bool" function:
     // This is the method for deleting a specific Job (Task) by ID:
-    @Deprecated
+    /*@Deprecated
     public boolean deleteJob(String id) {
         writeLock.lock();
         boolean res = false;
@@ -229,26 +233,29 @@ public class QueueService {
             writeLock.unlock();
         }
         return res;
-    }
+    }*/
+    // 2026-01-13-NOTE: ^ Removed because the jobs field is a memory hog even if it's deprecated and it's racking up my Railway bill.
 
     // 7. retry (see comment block above field "private final ScheduledExecutorService scheduler"):
     // TO-DO: DELETE THE METHOD BELOW WHEN ProcessingService.java-REHAUL IS COMPLETE AND TESTED!
     /*EDIT: LEGACY METHOD THAT WILL NO LONGER BE USED -- RETRY LOGIC WILL NOW LIVE IN ProcessingService.java
     (RETRY SCHEDULING IS PERSISTENCE-DRIVEN NOW, NOT MANUAL LIKE IT WAS WITH QueueService AND THE METHOD BELOW: */
-    @Deprecated
+    /*@Deprecated
     public void retry(Task t, long delayMs) {
         if(t.getStatus() != TaskStatus.FAILED) {
             logger.info("[QueueService] Retry request for Task {} (non-FAILED Task) rejected!", t.getId());
             return;
         }
         scheduler.schedule(() -> enqueue(t), delayMs, TimeUnit.MILLISECONDS);
-    }
+    }*/
+    // 2026-01-13-NOTE: ^ Removed because the jobs field is a memory hog even if it's deprecated and it's racking up my Railway bill.
 
     // HELPER-METHOD(S): Might be helpful for monitoring endpoints if necessary...
-    @Deprecated
+    /*@Deprecated
     public int getJobMapCount() {
         return jobs.size();
-    }
+    }*/
+    // 2026-01-13-NOTE: ^ Removed because the jobs field is a memory hog even if it's deprecated and it's racking up my Railway bill.
 
     /* NOTE-TO-SELF:
     - The ExecutorService needs explicit shutdown (else Spring Boot might hang on exit).

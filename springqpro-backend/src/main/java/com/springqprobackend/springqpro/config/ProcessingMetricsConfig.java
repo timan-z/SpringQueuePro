@@ -8,6 +8,8 @@ import io.micrometer.core.instrument.Timer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Duration;
+
 @Configuration
 public class ProcessingMetricsConfig {
     @Bean
@@ -44,8 +46,9 @@ public class ProcessingMetricsConfig {
     public Timer processingTimer(MeterRegistry registry) {
         return Timer.builder("springqpro_task_processing_duration")
                 .description("Time spent executing task handlers")
-                .publishPercentiles(0.50, 0.90, 0.95, 0.99)
+                .publishPercentiles(0.50, 0.90, 0.95)
                 .publishPercentileHistogram()
+                .sla(Duration.ofMillis(100), Duration.ofMillis(500), Duration.ofSeconds(1))
                 .register(registry);
     }
     // The one below is for the number of tasks made by users sending GraphQL queries:
@@ -55,22 +58,24 @@ public class ProcessingMetricsConfig {
                 .description("Tasks created from GraphQL API")
                 .register(registry);
     }   // TO-DO: GraphQL is my main API thing, but I'm keeping the REST stuff too -- maybe add another Counter for that specifically?
-    @Bean
+    /*@Bean
     public Counter queueEnqueueCounter(MeterRegistry registry) {
         return Counter.builder("springqpro_queue_enqueue_total")
                 .description("In-memory enqueue() calls (legacy path)")
                 .register(registry);
-    }   // <-- DEBUG: I can't remember if this is even used anymore at this point in the program...
+    }*/   // <-- DEBUG: I can't remember if this is even used anymore at this point in the program...
+    // 2026-01-13-NOTE: ^ Removed because the jobs field is a memory hog even if it's deprecated and it's racking up my Railway bill.
     @Bean
     public Counter queueEnqueueByIdCounter(MeterRegistry registry) {
         return Counter.builder("springqpro_queue_enqueue_by_id_total")
                 .description("enqueueById() calls feeding into ProcessingService")
                 .register(registry);
     }
-    @Bean
+    /*@Bean
     public Gauge inMemoryQueueSizeGauge(MeterRegistry registry, QueueService queueService) {
         return Gauge.builder("springqpro_queue_memory_size", queueService, q -> q.getJobMapCount())
                 .description("Number of tasks currently in legacy in-memory queue")
                 .register(registry);
-    }   // <-- DEBUG: I can't remember if this is even used anymore at this point in the program...
+    }*/   // <-- DEBUG: I can't remember if this is even used anymore at this point in the program...
+    // 2026-01-13-NOTE: ^ Removed because the jobs field is a memory hog even if it's deprecated and it's racking up my Railway bill.
 }

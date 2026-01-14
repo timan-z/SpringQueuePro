@@ -89,7 +89,7 @@ public class ProducerController {
 
     // 2. The equivalent of GoQueue's "http.HandleFunc("/api/jobs", func(w http.ResponseWriter, r *http.Request) {...}" function:
     // From producer.go: "THIS IS FOR [GET /api/jobs] and [GET /api/jobs?status=queued]" <-- hence why we're using @RequestParam
-    @GetMapping("/jobs")
+    /*@GetMapping("/jobs")
     public ResponseEntity<List<Task>> handleListJobs(@RequestParam(required = false) String status) {
         //Task[] allJobs = queue.getJobs();
         //List<Task> filtered = Arrays.stream(allJobs).filter(t -> t != null && (status == null || t.getStatus().toString().equalsIgnoreCase(status))).collect(Collectors.toList());
@@ -97,19 +97,19 @@ public class ProducerController {
         logger.info("The value of allJobs is {} and the value of queue.getJobs() is {}", allJobs, queue.getJobs());
         List<Task> filtered = allJobs.stream().filter(t -> t != null && (status == null || t.getStatus().toString().equalsIgnoreCase(status))).collect(Collectors.toList());
         return ResponseEntity.ok(filtered);
-    }
+    }*/
 
     // The handlers below will be for the individual methods in GoQueue's "http.HandleFunc("/api/jobs/", func(w http.ResponseWriter, r *http.Request) {...}" function:
     // 3. This is for [GET /api/jobs/:id]:
-    @GetMapping("/jobs/{id}")
+    /*@GetMapping("/jobs/{id}")
     public ResponseEntity<Task> handleGetJobById(@PathVariable String id) {
         Task t = queue.getJobById(id);
         if(t == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(t);
-    }
+    }*/
 
     // 4. This is for [POST /api/jobs/:id/retry]:
-    @PostMapping("/jobs/{id}/retry")
+    /*@PostMapping("/jobs/{id}/retry")
     public ResponseEntity<?> handleRetryJobById(@PathVariable String id) {
         Task t = queue.getJobById(id);
         if(t == null) return ResponseEntity.notFound().build();
@@ -137,18 +137,18 @@ public class ProducerController {
         if(!deleteRes) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(Map.of("message", String.format("Job %s deleted!", id)));
     }
-    /* DEBUG:+NOTE:+TO-DO: ^ When I get to the stage where I start really expanding on the API endpoints (making this a deployable microservice),
+    DEBUG:+NOTE:+TO-DO: ^ When I get to the stage where I start really expanding on the API endpoints (making this a deployable microservice),
     I want to change the return value here slightly. In best practice, it's not supposed to be a 200 (OK) response, RESTful API
     design has it so that what I'd do here is return 204 (No Content) sign, which would imply "the resource was deleted successfully,
     there is no further content to return."
     DEBUG:+NOTE:+TO-DO: Re-scan over all the functions, honestly, and evaluate if my return codes are correct later. (Do some more reading into return codes, etc).
-    */
+
 
     // 6. This is for the [POST /api/clear]
     @PostMapping("/clear")
     public ResponseEntity<?> clearQueue() {
         queue.clear();
         return ResponseEntity.ok(Map.of("message", "All jobs in the queue cleared!"));
-    }
+    }*/
 
 }

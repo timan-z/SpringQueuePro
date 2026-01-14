@@ -3,9 +3,7 @@ package com.springqprobackend.springqpro.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.*;
 
 /* ExecutorConfig.java
 --------------------------------------------------------------------------------------------------
@@ -52,11 +50,24 @@ public class ExecutorConfig {
 
     @Bean("execService")
     public ExecutorService taskExecutor() {
-       return Executors.newFixedThreadPool(props.getMainExecWorkerCount(), r -> {
-           Thread t = new Thread(r);
-           t.setName("QS-Worker-" + t.getId());
-           return t;
-       });
+        /*return Executors.newFixedThreadPool(props.getMainExecWorkerCount(), r -> {
+               Thread t = new Thread(r);
+               t.setName("QS-Worker-" + t.getId());
+               return t;
+        });*/
+        return new ThreadPoolExecutor(
+                props.getMainExecWorkerCount(),
+                props.getMainExecWorkerCount(),
+                0L,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(1000),
+                r -> {
+                    Thread t = new Thread(r);
+                    t.setName("QS-Worker-" + t.getId());
+                    t.setDaemon(true);
+                    return t;
+                }
+        );
     }
 
     @Bean("schedExec")

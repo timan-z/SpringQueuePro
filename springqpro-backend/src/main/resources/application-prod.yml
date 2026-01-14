@@ -31,13 +31,29 @@ spring:
     password: ${REDISPASSWORD}
     ssl: false  # # internal Railway Redis uses plain TCP.
 
+  graphql:
+    graphiql:
+      enabled: false
+
 jwt:
   secret: ${JWT_SECRET}
   expiration-ms: 900000       # 15 min
   refresh-expiration-ms: 604800000 # 7 days
 
+queue:
+  main-exec-worker-count: 5
+  sched-exec-worker-count: 2
+
 management:
   endpoints:
     web:
       exposure:
-        include: "health,metrics,prometheus"
+        include: health,prometheus
+  metrics:
+    enable:
+      jvm: false
+      process: false
+      system: false
+      executor: false
+      hibernate: false
+      logback: false

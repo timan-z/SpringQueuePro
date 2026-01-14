@@ -1700,6 +1700,13 @@ Planned enhancements to be added incrementally:
 
 These enhancements build directly on the existing metrics and APIs without requiring backend architectural changes.
 
+### Potential Changes Pre-CloudQueue
+
+#### Integrating Virtual Threads (Java 21)
+
+SpringQueuePro currently uses platform threads for clarity and debuggability. A future enhancement will migrate worker execution to **Java 21 virtual threads**, which dramatically reduce per-thread memory overhead and allow higher concurrency with minimal resource cost.
+- This change is intentionally deferred to keep the current architecture stable for demos and interviews.
+
 ---
 
 ### CloudQueue — AWS-Native Evolution
