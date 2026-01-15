@@ -1,3 +1,10 @@
 spring:
   main:
     allow-bean-definition-overriding: true
+
+t-handler:
+  default-sleep-time: 5
+  email-sleep-time: 5
+  sms-sleep-time: 5
+  report-sleep-time: 5
+  takes-long-sleep-time: 5

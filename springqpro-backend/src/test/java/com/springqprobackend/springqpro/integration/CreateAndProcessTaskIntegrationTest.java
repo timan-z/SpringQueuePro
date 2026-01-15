@@ -3,21 +3,21 @@ package com.springqprobackend.springqpro.integration;
 import com.springqprobackend.springqpro.domain.entity.TaskEntity;
 import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.repository.TaskRepository;
+import com.springqprobackend.springqpro.security.dto.AuthResponse;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.ResponseEntity;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.test.web.reactive.server.WebTestClient;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -55,10 +55,12 @@ public void sweepQueuedTasks() {
 */
 //@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 //@Tag("disable_temp")
-class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
-    @Autowired
-    private TestRestTemplate rest;
-
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class CreateAndProcessTaskIntegrationTest extends AbstractAuthenticatedIntegrationTest  {
+    //@Autowired
+    //private TestRestTemplate rest;
+    //@Autowired
+    //private WebTestClient webTestClient;
     @Autowired
     private TaskRepository taskRepository;
 
@@ -67,7 +69,79 @@ class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
         taskRepository.deleteAll();
     }
 
-    @Disabled("Outdated architecture — will fix later")
+    // HELPER METHODS - CreateAndProcessTaskIntegrationTest-specific:
+    // [1] - GraphQL task creation mutation template function:
+    private String createTaskAs(String email, String password, String payload) {
+        AuthResponse auth = registerAndLogin(email, password);
+        String mutation = """
+            mutation {
+              createTask(input: {
+                payload: "%s"
+                type: EMAIL
+              }) {
+                id
+                status
+                createdBy
+              }
+            }
+        """.formatted(payload);
+
+        AtomicReference<String> taskIdRef = new AtomicReference<>();
+        graphQLWithToken(auth.accessToken(), mutation)
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.createTask.id")
+                .value(id -> taskIdRef.set((String) id));
+        return taskIdRef.get();
+    }
+
+    // TEST(S):
+    @Test
+    void authenticatedUser_canCreateTask_andTaskIsEventuallyProcessed() {
+        String email = "worker@test.com";
+        String taskId = createTaskAs(email, "secure-pass", "integration-test");
+
+        // Assert persistence + ownership
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(3))
+                .untilAsserted(() -> {
+                    TaskEntity task = taskRepository.findById(taskId).orElseThrow();
+                    assertThat(task.getCreatedBy()).isEqualTo(email);
+                    assertThat(task.getStatus()).isEqualTo(TaskStatus.QUEUED);
+                });
+
+        // Assert eventual processing
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> {
+                    TaskEntity task = taskRepository.findById(taskId).orElseThrow();
+                    assertThat(task.getStatus())
+                            .isIn(TaskStatus.COMPLETED, TaskStatus.FAILED);
+                });
+    }
+
+    @Test
+    void createTask_setsCreatedByToAuthenticatedUser() {
+        String taskId = createTaskAs("a@test.com", "pw", "ownership-test");
+
+        TaskEntity task = taskRepository.findById(taskId).orElseThrow();
+        assertThat(task.getCreatedBy()).isEqualTo("a@test.com");
+    }
+
+    @Test
+    void createdTask_doesNotRemainQueuedForever() {
+        String taskId = createTaskAs("queue@test.com", "pw", "queue-drain-test");
+
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> {
+                    TaskEntity task = taskRepository.findById(taskId).orElseThrow();
+                    assertThat(task.getStatus()).isNotEqualTo(TaskStatus.QUEUED);
+                });
+    }
+
+    // OLD STUFF:
+    /*@Disabled("Outdated architecture")
     @Test
     void createTask_isPersisted_andEventuallyProcessed() {
         // Starting w/ creating Task via REST endpoint (my ProducerController's POST /enqueue):
@@ -75,8 +149,8 @@ class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
         ResponseEntity<Map> response = rest.postForEntity("/api/enqueue", req, Map.class);
         assertThat(response.getStatusCode().is2xxSuccessful());
 
-        /* After the Request is enqueued, that Task is saved to the DataBase and sent to the in-memory QueueService pool.
-        To make sure that the Task was persisted, we can check the most recent row in our DB: */
+        / After the Request is enqueued, that Task is saved to the DataBase and sent to the in-memory QueueService pool.
+        To make sure that the Task was persisted, we can check the most recent row in our DB: /
         Awaitility.await()
                 .atMost(Duration.ofSeconds(5))
                 .pollInterval(Duration.ofMillis(200))
@@ -96,5 +170,5 @@ class CreateAndProcessTaskIntegrationTest extends IntegrationTestBase {
                     Optional<TaskEntity> refreshed = taskRepository.findById(entity.getId());
                     return refreshed.map(e -> e.getStatus() == TaskStatus.COMPLETED || e.getStatus() == TaskStatus.FAILED).orElse(false);
                 });
-    }
+    }*/
 }

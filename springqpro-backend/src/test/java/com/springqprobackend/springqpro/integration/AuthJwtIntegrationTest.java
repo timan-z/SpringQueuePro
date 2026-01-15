@@ -66,83 +66,34 @@ be a nice alternative to what I was doing prior, which was flushing the DataBase
 */
 @AutoConfigureWebTestClient
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class AuthJwtIntegrationTest extends IntegrationTestBase {
-    @Autowired
-    private WebTestClient webTestClient;
+public class AuthJwtIntegrationTest extends AbstractAuthenticatedIntegrationTest {
+    //@Autowired
+    //private WebTestClient webTestClient;
     @Autowired
     private StringRedisTemplate redis;
     @Value("${jwt.secret}")
     private String jwtSecret;   // will be used for test that forges an expired JWT.
-
-    // HELPER METHODS (pretty self-explanatory):
-    // [1] - Register Attempt:
-    private void register(String email, String password) {
-        webTestClient.post()
-                .uri("/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of(
-                        "email", email,
-                        "password", password
-                ))
-                .exchange()
-                .expectStatus().isCreated();
-    }
-
-    // [2] - Login Attempt:
-    private AuthResponse login(String email, String password) {
-        return webTestClient.post()
-                .uri("/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of(
-                        "email", email,
-                        "password", password
-                ))
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(AuthResponse.class)
-                .returnResult()
-                .getResponseBody();
-    }
-
-    // [3] - Sending a GraphQL query with authenticataion token:
-    private WebTestClient.ResponseSpec graphQLWithToken(String token, String query) {
-        return webTestClient.post()
-                .uri("/graphql")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of("query", query))
-                .exchange();
-    }
 
     // TESTS:
     @Test
     @Order(1)
     // NOTE: Related to the enforcing order thing.
     void fullLoginFlow_shouldAllowAccessToProtectedGraphQL() {
-        String email = "random_email@gmail.com";
-        String password = "i_am_wanted_in_delaware";
+        AuthResponse auth = registerAndLogin(
+                "random_email@gmail.com",
+                "i_am_wanted_in_delaware"
+        );
 
-        // 1. Register:
-        register(email, password);
-        // 2. Login and get tokens:
-        AuthResponse auth = login(email, password);
-        assertThat(auth).isNotNull();
-        assertThat(auth.accessToken()).isNotBlank();
-        assertThat(auth.refreshToken()).isNotBlank();
-
-        String accessToken = auth.accessToken();
-
-        // 3. Call protected GraphQL with access token
         String query = """
-                query {
-                  tasks {
-                    id
-                    status
-                  }
-                }
-                """;
+            query {
+              tasks {
+                id
+                status
+              }
+            }
+        """;
 
-        graphQLWithToken(accessToken, query)
+        graphQLWithToken(auth.accessToken(), query)
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.data.tasks").exists();
