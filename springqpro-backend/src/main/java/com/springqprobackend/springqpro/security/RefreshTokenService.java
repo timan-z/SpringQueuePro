@@ -17,6 +17,7 @@ via user logout. (This feature was added as part of the JWT RBAC phase).
 --------------------------------------------------------------------------------------------------
 */
 
+@Deprecated
 @Service
 public class RefreshTokenService {
     // Field(s):

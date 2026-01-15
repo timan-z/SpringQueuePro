@@ -7,7 +7,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import java.util.concurrent.TimeUnit;
 
-/* RedisTokenStore.java
+/*
+2026-01-14-NOTE: This file is deprecated and entirely superseded by RedisTokenStore!
+--------------------------------------------------------------------------------------------------
+RedisTokenStore.java
 --------------------------------------------------------------------------------------------------
 This file stores and checks refresh tokens in Redis to enable server-side token revocation, token
 rotation, and immediate logout with revocation of tokens. It's this file that ensures refresh

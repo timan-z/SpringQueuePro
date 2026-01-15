@@ -2,11 +2,17 @@
 
 ## Introduction
 
-This document provides a focused deep dive into how **Authentication & Identity Management** is handled in the SpringQueuePro system. It will touch on how user identity is represented and persisted, how authentication is performed in a **stateless manner using JWTs**, and how session trust is maintained through **access tokens**, **refresh tokens**, and **Redis-backed refresh token rotation**. 
+This document provides a focused deep dive into how **Authentication & Identity Management** is implemented in the SpringQueuePro system. It explains how user identity is represented and persisted, how authentication is performed using **stateless JWT access tokens**, and how session trust is maintained through **Redis-backed refresh token persistence and rotation**.
 
-- The goal of this section is to explain who a `User` is, how they prove their identity to the system, and how that trust is safely maintained over time, even in a distributed, horizontally scalable environment. (*It will also touch on the **deliberate architectural choices made to mimic real-world system design practices***).
+The goal of this section is to clearly articulate:
+- Who a `User` is in the context of SpringQueuePro
+- How users prove their identity to the system
+- How that trust is safely maintained over time in a distributed, horizontally scalable environment
 
-**NOTE**: This document will **not** cover authorization concerns relating to role-based access control (RBAC), endpoint protection, nor method-level security annotations. (Those topics are addressed separately in the Security Configuration & RBAC "deep dive" documentation).
+Special emphasis is placed on the **deliberate architectural decisions made to mirror real-world production systems**, rather than relying on simplified or purely academic authentication patterns.
+
+> **NOTE**: This document focuses strictly on authentication and identity management.  
+> Authorization concerns such as RBAC, endpoint protection rules, and method-level security annotations are covered separately in the *Security Configuration & RBAC* deep dive.
 
 ---
 
@@ -16,129 +22,176 @@ This document provides a focused deep dive into how **Authentication & Identity 
 - [Relevant Project Files](#relevant-project-files)
 - [Steps Taken to Mimic Production Quality](#steps-taken-to-mimic-production-quality)
 
+---
+
 ## Why a `User` Exists in My Task/Job Queue System
 
-SpringQueuePro is a distributed task/job processing engine, and in its most minimal form (*see SpringQueue*) can operate without any notion of `User`(s) at all. (*That is, tasks could be submitted and processed globally*). However, SpringQueuePro is intentionally designed to resemble real-world task queue services, where a queue is **not a single global resource but a multi-tenant platform consumed by multiple independent clients**.
+At its core, SpringQueuePro is a distributed task/job processing engine. In its most minimal form (as demonstrated in *SpringQueue*), such a system can operate without any notion of `User`s at all — tasks could be submitted and processed globally without ownership or isolation.
 
-Having the concept of a `User` allows the system to model ownership, isolation, and accountability in the realm of task execution. **Each authenticated user represents a distinct consumer of the queue service**, with their own logical task-processing domain. Tasks are created on behalf of a user, persisted with ownership metadata, and later queried, managed, and observed within the same user boundary.
+SpringQueuePro intentionally moves beyond this model to resemble **real-world queue platforms**, where a queue is not a single global resource but a **multi-tenant service consumed by multiple independent clients**.
+
+Introducing the concept of a `User` enables the system to model:
+- Ownership
+- Isolation
+- Accountability
+
+Each authenticated user represents a **distinct consumer of the queue service**, operating within their own logical boundary. Tasks are created on behalf of a user, persisted with ownership metadata, and later queried, managed, and observed within that same boundary.
 
 ### This guarantees:
 1. Tasks are scoped to an owning user, preventing accidental or unauthorized cross-visibility.
-2. The system can safely support multiple concurrent users submitting and inspecting tasks simultaneously.
-3. The queue behaves like a shared infrastructure service rather than a single-purpose job runner.
+2. The system can safely support multiple concurrent users submitting and inspecting tasks.
+3. The queue behaves like shared infrastructure rather than a single-purpose job runner.
 
-While SpringQueuePro is not a hosted production service (*for commercial use*), this multi-user model mirrors how real-world systems (such as Celery-backed platforms, managed queues, or internal job orchestration services) separate concerns between infrastructure and clients. The queue engine itself remains generic and reusable, while users provide the contextual boundary that makes the system realistic, secure, and extensible.
+Importantly, **user identity is orthogonal to task execution mechanics**. Workers, retries, locking, and persistence behave identically regardless of task ownership. Identity exists to define *who may submit, view, and manage tasks*, not *how tasks are processed*.
 
-The introduction of the `User` entity is orthogonal to task execution mechanics: workers, retries, locking, and persistence behave identically regardless of who owns a task. User identity exists to define who may submit, view, and manage tasks, not how tasks are processed. **This separation keeps the core queue engine clean while enabling SpringQueuePro to function as a true multi-tenant service rather than a single-user demonstration**.
-
-## Authentication Model
-
-SpringQueuePro uses a **dual-token authentication model** inspired by OAuth-style systems:
-- **Access Tokens**
-    - Short-lived JWTs
-    - Used to authenticate API requests
-    - Never stored server-side
-    - Expire quickly to reduce "blast radius" if compromised
-- **Refresh Tokens**
-    - Longer-lived JWTs
-    - Stored server-side in Redis
-    - Used only to obtain new access tokens
-    - Rotated on every refresh to prevent replay attacks
-
-This separation allows the system to **balance security and usability in a way that mirrors real production systems**.
-
-## Relevant Project Files
-`security/`:
-- `JwtAuthenticationFilter`
-
-    - **Enforces stateless authentication** by validating access tokens on every request 
-    
-    - Establishes the authenticated user in Spring Security's `SecurityContext`.
-
-    - Explicitly rejects refresh tokens at the filter layer to prevent misuse as API credentials.
-
-    - Ensures that *only* short-lived tokens (access tokens) can authenticate requests.
-
-- `JwtUtil`
-    - **Centralizes JWT creation and validation logic**, ensuring consistent token structure, cryptographic verification, expiration enforcement, and explicit token typing across the system.
-
-- `RefreshTokenService`
-    - **Provides Redis-backed storage** for refresh tokens, enabling rotation, revocation, and replay protection at the authentication flow level.
-
-- `CustomUserDetailsService`
-    - **Bridges persisted user identity (UserEntity) into Spring Security’s authentication model**, allowing JWT-authenticated requests to resolve a fully populated security principal.
-
-- `dto/*`
-    - Just a collection of data transfer objects for readability, for example:<br>
-    `public record LoginRequest(String email, String password) { }`
-
-`controller/auth/AuthenticationController`
-- **Defines the authentication lifecycle endpoints** (register, login, refresh, logout) and orchestrates token issuance, rotation, and revocation.
-
-- This controller is intentionally separate from the task-related controllers and APIs (clean separation of concerns).
-
-`redis/RedisTokenStore`
-- **Provides Redis-backed persistence** for issued refresh tokens, enabling rotation, revocation, and replay prevention across the cluster.
-
-`domain/entity/UserEntity`
-- `UserEntity` is the persistent user identity role metadata. It represents a user's account information—which, for the sake of this project, is just an email and password hash.
-
-- PostgreSQL remains the system of record for identity, independent of authentication tokens or session state. (*This data is stored in the database and doesn't depend on either tokens or if the user is currently logged in*).
-
-## Steps Taken to Mimic Production Quality
-
-I like to consider my SpringQueuePro project production-grade (or at the very least production-adjacent) because I designed the system around **operational realities**, and so this section here is dedicated to the design choices—relating to SQP's authentication system—that reflect this decision.
-
-Here are some key characteristics that stand out about SQP's authentication setup:
-
-### 1. Stateless Runtime Authentication
-
-Every request is authenticated independently using an access token. There are:
-
-- No HTTP sessions
-- No server-side authentication state
-- No reliance on sticky sessions
-
-This allows the system to scale horizontally and survive restarts without breaking authentication.
+This separation keeps the core queue engine clean while allowing SpringQueuePro to function as a realistic, secure, multi-tenant system rather than a single-user demonstration.
 
 ---
 
-### 2. Short-Lived Access Tokens for Safety
+## Authentication Model
 
-Access tokens are intentionally short-lived. If an access token is compromised, its usefulness is limited in time, reducing the impact of credential leakage.
+SpringQueuePro uses a **hybrid authentication model** inspired by OAuth-style systems, combining stateless and stateful components:
 
-This reflects real-world security practices used in OAuth2, cloud APIs, and large-scale distributed systems.
+### Access Tokens
+- Short-lived JWTs
+- Used to authenticate API requests
+- Never stored server-side
+- Cryptographically validated on every request
+- Explicitly typed (`type=access`) to prevent misuse
+
+### Refresh Tokens
+- Longer-lived JWTs
+- **Persisted server-side in Redis**
+- Used only to obtain new access tokens
+- Rotated on every refresh
+- Explicitly revocable (logout, expiry, rotation)
+
+This separation allows the system to balance **scalability, security, and usability**, mirroring how production-grade APIs and cloud platforms handle authentication.
+
+---
+
+## Relevant Project Files
+
+### `security/`
+
+#### `JwtAuthenticationFilter`
+- Enforces stateless authentication by validating access tokens on every protected request.
+- Extracts identity from JWTs and populates Spring Security’s `SecurityContext`.
+- Explicitly rejects refresh tokens at the filter layer to prevent misuse as API credentials.
+- Ensures only short-lived access tokens may authenticate API requests.
+
+#### `JwtUtil`
+- Centralizes JWT creation and validation logic.
+- Handles cryptographic verification, expiration enforcement, token typing, and safe subject extraction.
+- Explicitly distinguishes expired tokens from malformed or tampered tokens.
+
+#### `CustomUserDetailsService`
+- Bridges persisted user identity (`UserEntity`) into Spring Security’s authentication model.
+- Loads users from PostgreSQL and resolves roles/authorities dynamically at request time.
+- Allows authorization decisions to remain data-driven even with stateless JWTs.
+
+#### `dto/*`
+- Simple request/response DTOs used by authentication endpoints for clarity and boundary enforcement.
+  - e.g. `LoginRequest`, `RegisterRequest`, `RefreshRequest`, `AuthResponse`
+
+---
+
+### `controller/auth/AuthenticationController`
+
+- Defines the authentication lifecycle endpoints:
+  - `POST /auth/register`
+  - `POST /auth/login`
+  - `POST /auth/refresh`
+  - `POST /auth/logout`
+  - `GET /auth/refresh-status`
+- Orchestrates token issuance, rotation, and revocation.
+- Intentionally isolated from task-related controllers to preserve separation of concerns.
+
+---
+
+### `redis/RedisTokenStore`
+
+- Acts as the **source of truth for refresh token lifecycle**.
+- Persists issued refresh tokens with TTL.
+- Resolves refresh tokens to owning users.
+- Enables:
+  - Token rotation
+  - Explicit logout
+  - Session invalidation
+  - Replay protection
+  - Cluster-wide session coordination
+
+> **NOTE**: Earlier iterations of the project included a `RefreshTokenService`.  
+> The current architecture standardizes refresh token persistence exclusively through `RedisTokenStore`, which supersedes and effectively deprecates that older abstraction.
+
+---
+
+### `domain/entity/UserEntity`
+
+- Persistent representation of a user account.
+- Stores:
+  - Email (primary key)
+  - BCrypt-hashed password
+  - Role metadata
+- PostgreSQL serves as the **system of record for identity**, independent of session state or token lifetime.
+
+---
+
+## Steps Taken to Mimic Production Quality
+
+SpringQueuePro’s authentication system was designed around **operational realities**, not just theoretical correctness. The following characteristics reflect that intent:
+
+---
+
+### 1. Stateless Runtime Authentication
+
+Every protected request is authenticated independently using an access token.
+
+- No HTTP sessions
+- No server-side authentication state
+- No sticky sessions
+
+This allows the system to scale horizontally and tolerate restarts without breaking authentication.
+
+---
+
+### 2. Short-Lived Access Tokens
+
+Access tokens are intentionally short-lived to reduce the blast radius of credential leakage.
+
+This mirrors best practices used in OAuth2, cloud APIs, and large-scale distributed systems.
 
 ---
 
 ### 3. Refresh Tokens for Session Continuity
 
-Rather than extending access token lifetimes indefinitely, SpringQueuePro uses refresh tokens to maintain session continuity. This allows:
-- Frequent access token rotation
-- Reduced exposure window
-- Better control over long-lived sessions
+Session continuity is maintained via refresh tokens rather than long-lived access tokens.
 
-This mirrors how real systems balance usability with security.
+This enables:
+- Frequent access token rotation
+- Reduced exposure windows
+- Better control over long-lived sessions
 
 ---
 
-### 4. Server-Side Refresh Token Storage (Redis)
+### 4. Server-Side Refresh Token Tracking (Redis)
 
-Although JWTs are stateless, refresh tokens are **intentionally tracked server-side**. This enables capabilities that purely stateless JWT systems cannot provide:
+Although access tokens are stateless, refresh tokens are **intentionally tracked server-side**.
 
+This enables capabilities that purely stateless JWT systems cannot provide:
 - Explicit logout
 - Forced session invalidation
 - Replay attack prevention
-- Cluster-wide session control
+- Concurrency-safe rotation
 
-Redis serves as a lightweight, fast coordination layer that supports these guarantees without reintroducing heavyweight session management.
+Redis serves as a lightweight coordination layer without reintroducing heavyweight session management.
 
 ---
 
 ### 5. Clear Separation of Concerns
 
-Authentication logic is cleanly separated into:
-- Identity persistence (`UserEntity`)
+Authentication responsibilities are cleanly separated into:
+- Identity persistence (`UserEntity`, `UserRepository`)
 - Token cryptography (`JwtUtil`)
 - Request authentication (`JwtAuthenticationFilter`)
 - Session coordination (`RedisTokenStore`)
@@ -155,14 +208,24 @@ Authentication flows explicitly handle:
 - Invalid or tampered tokens
 - Missing tokens
 - Revoked refresh tokens
-- Ambiguous Redis vs JWT expiration scenarios
+- Redis vs JWT expiration mismatches
+
+These cases are tested and handled deliberately rather than implicitly.
 
 ---
 
 ### 7. Alignment with Real Operational Systems
 
-While SpringQueuePro is a learning project, its authentication model aligns closely with:
+While SpringQueuePro is a learning project, its authentication model closely aligns with:
 
 - OAuth-style token systems
-- Cloud service authentication models
-- Real background job platforms with multi-tenant access (of course e.g., Celery)
+- Cloud service authentication patterns
+- Multi-tenant job processing platforms (e.g., Celery-backed services)
+
+This makes the system both realistic and extensible, without compromising clarity or correctness.
+
+---
+
+## SUMMARY
+
+SpringQueuePro uses short-lived JWT access tokens for stateless authentication and Redis-backed refresh tokens for server-side session control. Access tokens cryptographically assert identity and are validated per request, while refresh tokens are persisted, rotated, and revoked centrally. Spring Security enforces endpoint and method-level authorization, resolving authenticated users and roles dynamically via a PostgreSQL-backed `UserDetailsService`. This hybrid design balances scalability, security, and revocability while keeping authorization decisions consistent and extensible.
