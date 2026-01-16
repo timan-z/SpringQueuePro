@@ -23,15 +23,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 */
 //public abstract class IntegrationTestBase extends BasePostgresContainer {
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.main.allow-bean-definition-overriding=true")
-@Testcontainers
 @ActiveProfiles("test")
 @Sql(
         scripts = "/cleanup.sql",
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
 )
-public abstract class IntegrationTestBase {
+public abstract class IntegrationTestBase extends ContainerTestBase {
 
-    @Container
+    /*@Container
     static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>("postgres:18")
                     .withDatabaseName("springqpro")
@@ -45,7 +44,7 @@ public abstract class IntegrationTestBase {
             new GenericContainer<>("redis:7-alpine")
                     .withExposedPorts(6379)
                     .withReuse(false);
-                    //.withReuse(true);
+                    //.withReuse(true);*/
 
     @DynamicPropertySource
     static void registerDynamicProps(DynamicPropertyRegistry registry) {
