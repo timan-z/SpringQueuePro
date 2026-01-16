@@ -7,7 +7,7 @@ This document provides a focused deep dive into how the **API Layer (REST + Grap
 SpringQueuePro intentionally uses **both REST and GraphQL**, but they serve **different, well-defined roles**:
 
 - **REST** is used for **authentication, identity, and session-oriented flows**, where request/response semantics and explicit endpoints are the natural fit.
-- **GraphQL** is used for **task-domain interaction**, including task creation, inspection, filtering, retry orchestration, and runtime visibility.
+- **GraphQL** is used for **task-domain interaction**, including task creation, inspection, filtering, retry requests, and runtime visibility.
 
 This separation is deliberate and mirrors real-world systems, where authentication is often handled via REST endpoints, while domain interaction—especially read-heavy and exploratory workloads—is better served by GraphQL.
 

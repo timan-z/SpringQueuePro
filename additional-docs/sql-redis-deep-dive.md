@@ -92,21 +92,27 @@ This mirrors real production systems where Redis is treated as an **optimization
 
 ## Distributed Locking Model
 
-SpringQueuePro uses Redis to implement **token-based distributed locks** to ensure **exactly-once task execution semantics**.
+SpringQueuePro uses Redis to implement **token-based distributed locks** to ensure **effectively-once task execution under cooperative correctness semantics**.
+- DB conditional updates (see `TaskRepository`) are the true guard.
+- Redis locks are secondary but play an important role in ensuring that no two workers execute the same task simultaneously.
+
+Important point of emphasis is that Redis locks do not replace DataBase state transitions.
+- Redis locks exist *after* DataBase ownership is established.
+- Redis is about **execution coordination**, not claim correctness.
 
 ### Lock Acquisition
 
 Locks are acquired using Redis’ atomic `SET NX PX` semantics:
 
-* `NX` ensures the lock is only set if absent
-* `PX` applies a time-to-live (TTL)
-* Each lock stores a **unique token** identifying the owner
+- `NX` ensures the lock is only set if absent
+- `PX` applies a time-to-live (TTL)
+- Each lock stores a **unique token** identifying the owner
 
 This guarantees:
 
-* Mutual exclusion
-* Automatic recovery if a worker crashes
-* No reliance on manual cleanup
+- Mutual exclusion
+- Automatic recovery if a worker crashes
+- No reliance on manual cleanup
 
 If a lock cannot be acquired, the worker simply does not proceed.
 

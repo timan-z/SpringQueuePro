@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document provides a focused deep dive into how **Processing, Retry & Failure Orchestration** is implemented in my SpringQueuePro system.
+This document provides a focused deep dive into how **Processing, Retry & Failure Orchestration** is implemented in the SpringQueuePro system.
 
 While the **Task Domain & Persistence** deep dive explains how PostgreSQL enforces correctness and atomic state transitions, and the **Distributed Coordination & Redis Integration** deep dive explains how Redis provides safe mutual exclusion under concurrency, this document focuses on **what happens after a task has been claimed**:
 
@@ -28,7 +28,7 @@ This document explains and highlights:
 - How manual requeueing is supported safely
 - Steps taken to mirror production-grade retry semantics
 
-**NOTE**: This document intentionally does **not** re-explain database claim semantics (`QUEUED → IN_PROGRESS`) or Redis lock mechanics. Those topics are covered in the *Task Domain & Persistence* and *Distributed Coordination & Redis Integration* deep dives. The focus here is strictly on **execution flow after claim, failure classification, and retry orchestration**.
+**NOTE**: This document intentionally does **not** re-explain database claim semantics (`QUEUED → INPROGRESS`) or Redis lock mechanics. Those topics are covered in the *Task Domain & Persistence* and *Distributed Coordination & Redis Integration* deep dives. The focus here is strictly on **execution flow after claim, failure classification, and retry orchestration**.
 
 ---
 
@@ -43,6 +43,8 @@ This document explains and highlights:
 - [Observability of Processing & Retry Behavior](#observability-of-processing--retry-behavior)
 - [Steps Taken to Mimic Production Quality](#steps-taken-to-mimic-production-quality)
 
+---
+
 ## Why Retry Orchestration Is Critical in SpringQueuePro
 
 SpringQueuePro is designed as a concurrent, multi-worker task system where **tasks may legitimately fail** due to:
@@ -51,7 +53,7 @@ SpringQueuePro is designed as a concurrent, multi-worker task system where **tas
 - deterministic failures (simulated via “fail absolute” handlers)
 - runtime exceptions during execution
 - timeouts or resource contention
-- infrastructure instability (Redis/network/db issues)
+- infrastructure instability (Redis/network/database issues)
 
 In a system like this, retry behavior cannot be an afterthought. If retries are poorly designed:
 
@@ -62,6 +64,8 @@ In a system like this, retry behavior cannot be an afterthought. If retries are 
 - failure behavior becomes impossible to debug
 
 For these reasons, SpringQueuePro treats retries as a **first-class orchestration concern** and places retry logic in a single authoritative location: `ProcessingService`.
+
+---
 
 ## Handlers vs Orchestration: Clear Responsibility Boundaries
 
@@ -77,23 +81,28 @@ public interface TaskHandler {
 }
 ```
 
-Handlers are intentionally “dumb”:
-- they perform task-specific work (*or at least simulate supposed task-distinct work*)
+Handlers are intentionally simple:
+
+- they perform task-specific work (or simulate task-distinct work)
 - they may sleep to simulate real processing latency
 - they throw exceptions to signal failure
 
 Handlers do **not**:
+
 - mutate database state
 - schedule retries
 - re-enqueue tasks
 - acquire locks
 - decide eligibility for retries
 
-This separation mirrors real production systems where business logic is isolated from runtime policy.
+This separation mirrors real production systems where business logic is isolated from execution policy.
+
+---
 
 ### Orchestration Layer (Execution Policy)
 
 The orchestration layer (`ProcessingService`) is responsible for:
+
 - persisting outcomes (`COMPLETED` / `FAILED`)
 - determining retry eligibility
 - computing backoff
@@ -101,94 +110,110 @@ The orchestration layer (`ProcessingService`) is responsible for:
 - maintaining observability and metrics
 
 This keeps all retry semantics:
+
 - centralized
 - testable
 - predictable
 - auditable
 
+---
+
 ## ProcessingService as the Policy Engine
 
 `ProcessingService` is the runtime component that converts **a claimed task** into a **deterministic lifecycle outcome**.
 
-Even though `claimAndProcess` contains claim and locking logic, its most important role is what happens *after execution begins*:
-- wrap handler execution in measurement
-- treat exceptions as control flow signals
-- persist failure explicitly
-- enforce retry policy centrally
+Although `claimAndProcess` contains validation, claim, and locking logic, its most important responsibility begins **after execution starts**:
 
-A key design decision is that task handlers are executed inside a controlled boundary:
-- execution happens inside a try/catch
-- the orchestration layer is the only place where failure transitions and retries are triggered
-- all state mutations occur via persistence-driven updates and repository methods
+- wrapping handler execution in measurement
+- treating exceptions as control-flow signals
+- persisting failure deterministically
+- enforcing retry policy centrally
 
-This resembles the execution loop found in:
+A key design decision is that handler execution occurs inside a tightly controlled boundary:
+
+- execution is wrapped in a try/catch
+- orchestration logic exclusively owns failure handling and retries
+- all lifecycle mutations occur via repository-backed persistence
+
+This structure closely resembles execution loops found in:
+
 - job queues
-- message consumer frameworks
+- message consumers
 - worker schedulers
-- cloud-native retry systems (SQS/Kafka + backoff policies)
+- cloud-native retry systems (e.g., SQS/Kafka-style consumers)
+
+---
 
 ## Failure Handling & Deterministic Persistence
 
 When handler execution throws an exception (including `TaskProcessingException`), `ProcessingService` handles it deterministically:
 
 1. The task is marked `FAILED` in the domain model.
-2. The entity is updated from the domain model (`taskMapper.updateEntity(...)`).
+2. The persistence entity is updated via `TaskMapper`.
 3. The failed task is persisted immediately (`taskRepository.save(...)`).
-4. The cache is synchronized (`cache.put(...)`).
-5. Failure counters and events are recorded.
+4. The Redis cache is synchronized (`cache.put(...)`).
+5. Failure counters and runtime events are recorded.
 
-This means failures are:
+This ensures that failures are:
+
 - explicit
 - durable
 - observable
-- never “silent”
+- never silent
 
-Importantly, failure persistence happens **before retry scheduling**. This ensures that:
-- retries are never scheduled without first recording the failure state
-- dashboards and inspection APIs always reflect real system behavior
+Crucially, failure persistence occurs **before any retry scheduling**. This guarantees that:
+
+- retries are never scheduled without recorded failure
+- dashboards and APIs reflect real system state
 - the system remains debuggable during heavy retry activity
 
 ---
 
 ## Automatic Retries with Exponential Backoff
 
-After persisting a failure, SpringQueuePro evaluates retry eligibility:
+After persisting a failure, `ProcessingService` evaluates retry eligibility:
 
 ```java
 if (claimed.getAttempts() < claimed.getMaxRetries()) { ... }
 ```
 
-If eligible:
+If the task is eligible for retry:
 
-1. The retry delay is computed via `computeBackoffMs(attempts)
+1. A delay is computed using `computeBackoffMs(attempts)`
 2. The task is transitioned from `FAILED → QUEUED`
-3. Retry is scheduled using the internal scheduler
+3. Retry execution is scheduled via the scheduler
 4. Retry metrics and events are recorded
+
+---
 
 ### Why FAILED → QUEUED Is Explicit
 
-This is not cosmetic. It is a **correctness requirement**.
+This transition is not cosmetic—it is required for correctness.
 
-The claim step only succeeds for `QUEUED` tasks. If a failed task remained `FAILED`, it would never be eligible for re-claim.
+The claim mechanism only operates on `QUEUED` tasks. A task that remains `FAILED` cannot be reclaimed or retried.
 
-SpringQueuePro therefore treats “re-queued retry” as a **real state transition**, not as an invisible runtime trick.
+SpringQueuePro therefore treats retries as **real lifecycle transitions**, not invisible runtime shortcuts.
+
+---
 
 ### Exponential Backoff Policy
 
-The backoff function:
+The backoff computation:
 
 ```java
 return (long) (1000 * Math.pow(2, Math.max(0, attempts - 1)));
 ```
 
-This mirrors real-world retry semantics because it:
+This mirrors production retry semantics because it:
 
 - reduces pressure on downstream systems
-- prevents lockstep retry waves
-- avoids hammering infrastructure during failure spikes
-- stabilizes recovery under load
+- avoids synchronized retry waves
+- prevents infrastructure hammering
+- stabilizes recovery under failure spikes
 
-The goal is not just to “retry”—it is to retry **safely and predictably**.
+The objective is not merely to retry, but to retry **safely and predictably**.
+
+---
 
 ### Why Scheduling Lives in ProcessingService
 
@@ -198,57 +223,59 @@ Retry scheduling is performed via:
 scheduler.schedule(() -> queueService.enqueueById(taskId), delayMs, TimeUnit.MILLISECONDS);
 ```
 
-This is intentionally routed through:
+This design is intentional:
 
-- the scheduler for delay control
-- the queue service for controlled submission
-- the same orchestration entry point used for normal execution
+- delays are controlled by the scheduler
+- execution re-enters via `QueueService`
+- retries follow the exact same execution path as initial runs
 
-This avoids creating hidden “alternate execution paths” for retries.
+This avoids hidden or bypassed execution paths.
 
 ---
 
 ## Manual Requeueing (Operator-Controlled Retry)
 
-SpringQueuePro supports explicit operator-style retry through:
+SpringQueuePro supports explicit, operator-style retry through:
 
 ```java
 public boolean manuallyRequeue(String taskId)
 ```
 
-Manual requeueing is intentionally strict:
+Manual requeueing is deliberately strict:
 
-- Only `FAILED` tasks may be manually requeued
-- The state transition is enforced in the database (`FAILED → QUEUED`)
-- Attempts are reset to 0 (to re-enable retry semantics cleanly)
-- Cache is synchronized
-- A `TaskCreatedEvent` is published
+- only `FAILED` tasks are eligible
+- state transition (`FAILED → QUEUED`) is enforced in the database
+- attempts are reset to zero
+- Redis cache is synchronized
+- a `TaskCreatedEvent` is published
 
-Publishing the event (rather than directly calling `enqueueById`) is deliberate: it ensures runtime submission happens only after the transaction commits, preventing “phantom execution” of tasks whose state hasn’t actually been persisted yet.
+Publishing the event—rather than calling `enqueueById` directly—is deliberate. It ensures execution occurs only **after the transaction commits**, preventing execution of tasks whose state is not yet durable.
 
-This mirrors real production systems where operational commands (manual retry) are handled through the same lifecycle mechanisms as normal execution.
+This mirrors production systems where operational actions reuse the same lifecycle pathways as normal execution.
 
 ---
 
 ## Observability of Processing & Retry Behavior
 
-SpringQueuePro makes processing and retry behavior explicitly visible through:
+SpringQueuePro exposes processing and retry behavior explicitly via:
 
 ### 1. Metrics
 
 - submitted, claimed, completed, failed, retried counters
 - execution timing via `processingTimer.recordCallable(...)`
 
-This enables:
+These enable:
 
 - throughput analysis
-- failure rate analysis
-- latency distribution inspection
+- failure rate inspection
+- latency distribution tracking
 - retry volume monitoring
+
+---
 
 ### 2. Runtime Event Log
 
-A bounded event log captures key execution transitions:
+A bounded in-memory event log captures execution transitions:
 
 - CLAIM_START / CLAIM_SUCCESS
 - PROCESSING
@@ -256,11 +283,11 @@ A bounded event log captures key execution transitions:
 - COMPLETED
 - LOCK_RELEASE
 
-This log exists to support:
+This supports:
 
 - dashboard visibility
-- debugging without logs
-- replaying recent runtime history during demos or incidents
+- debugging without backend logs
+- replaying recent runtime behavior during demos or incidents
 
 ---
 
@@ -268,17 +295,17 @@ This log exists to support:
 
 ### 1. Centralized Retry Policy
 
-Retries are enforced in one place, not scattered across handlers. This prevents:
+Retries are enforced in one location, not scattered across handlers. This prevents:
 
-- inconsistent retry semantics
+- inconsistent semantics
 - handler complexity
-- hidden execution paths
+- hidden execution behavior
 
 ---
 
 ### 2. Failure Is Always Persisted First
 
-Failures are recorded durably before retries are scheduled. This ensures:
+Failures are durably recorded before retries are scheduled, ensuring:
 
 - correctness under crash scenarios
 - consistent observability
@@ -288,24 +315,24 @@ Failures are recorded durably before retries are scheduled. This ensures:
 
 ### 3. Backoff Is Applied Deliberately
 
-Exponential backoff prevents retry storms and stabilizes the system under repeated failure. This mirrors real cloud-native patterns.
+Exponential backoff stabilizes the system and prevents retry storms, mirroring cloud-native patterns.
 
 ---
 
 ### 4. Handlers Are Pure Units of Work
 
-Handlers do not coordinate retries or persistence. They either:
+Handlers:
 
-- complete successfully
+- execute work
 - throw exceptions
 
-This is a clean and scalable separation of concerns.
+They do not coordinate retries or persistence.
 
 ---
 
 ### 5. Retry Scheduling Uses Controlled Runtime Paths
 
-Retries re-enter the system through the same submission pipeline (`enqueueById`), ensuring:
+Retries re-enter through the same submission pipeline (`enqueueById`), ensuring:
 
 - consistent execution boundaries
 - uniform observability
@@ -317,14 +344,14 @@ Retries re-enter the system through the same submission pipeline (`enqueueById`)
 
 SpringQueuePro treats task processing as an orchestration problem, not a handler problem.
 
-Handlers do work. Failures are persisted. Retries are policy-driven. Backoff is deliberate. Execution re-enters the pipeline through controlled scheduling.
+Handlers execute work. Failures are persisted. Retries are policy-driven. Backoff is deliberate. Execution re-enters through controlled scheduling.
 
-This design yields task execution behavior that is:
+This yields processing behavior that is:
 
 - deterministic
 - scalable
 - observable
-- production-adjacent in its operational semantics
+- production-adjacent in operational semantics
 
 In short:
 

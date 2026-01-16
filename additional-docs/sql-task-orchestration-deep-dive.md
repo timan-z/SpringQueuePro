@@ -31,6 +31,8 @@ This document explains and highlights:
 - [Worker Runtime Observability](#worker-runtime-observability)
 - [Steps Taken to Mimic Production Quality](#steps-taken-to-mimic-production-quality)
 
+---
+
 ## Why Task Execution Is Hard in Distributed Systems
 
 Executing tasks reliably is deceptively complex. Even seemingly simple systems must contend with:
@@ -70,9 +72,9 @@ This model worked for early experimentation but had fundamental limitations:
 As persistence, Redis coordination, and transactional guarantees were introduced, the role of the worker changed fundamentally.
 
 Today:
-- **Worker objects no longer exist as domain actors**
+- **Worker objects no longer participate in the execution path**
 - Execution threads are **stateless and interchangeable**
-- All business logic, retries, and correctness rules live in a centralized orchestration service
+- All execution policy, retries, and lifecycle enforcement live in a centralized orchestration service
 
 The deprecated `Worker.java` remains only as a historical artifact to document this evolution. Its removal from the execution path is a **deliberate architectural improvement**, not a regression.
 
@@ -87,14 +89,15 @@ At a high level, execution flows as follows:
 ```
 TaskCreatedEvent
   → QueueService.enqueueById
-    → ExecutorService thread
-      → ProcessingService.claimAndProcess
-        → Database claim
-        → Redis lock
-        → Handler execution
-        → Persist outcome
-        → Retry or completion
+  → ExecutorService thread
+  → ProcessingService.claimAndProcess
+  → Database claim
+  → Redis lock
+  → Handler execution
+  → Persist outcome
+  → Retry or completion
 ```
+
 
 Key characteristics of this model:
 - Tasks are **identified by ID**, not passed as mutable objects.
@@ -104,19 +107,23 @@ Key characteristics of this model:
 
 This mirrors how real-world systems treat workers as **replaceable runtime capacity**, not as owners of business logic.
 
+---
+
 ## Relevant Project Files
 
 - `service/ProcessingService` — the **central runtime orchestration engine** responsible for claiming tasks, executing handlers, handling failures, and scheduling retries.
 
 - `service/QueueService` — owns the `ExecutorService` and acts as the **controlled submission boundary** between events, retries, and execution threads.
 
-- `config/ExecutorConfig` — defines executor sizing and thread configuration, allowing concurrency to be tuned independently of correctness guarantees.
+- `config/ExecutorConfig` — defines bounded thread pools and scheduling executors, ensuring concurrency is **explicit, limited, and observable**.
 
-- `repository/TaskRepository` — provides atomic claim operations that gate execution at the persistence layer.
+- `repository/TaskRepository` — enforces atomic lifecycle transitions that gate execution and retries.
 
-- `models/TaskHandlerRegistry` — maps task types to handlers, enabling extensible execution logic without coupling handlers to orchestration.
+- `models/TaskHandlerRegistry` — resolves task types to handlers without coupling handlers to orchestration logic.
 
-- `redis/RedisDistributedLock` — provides distributed mutual exclusion during execution, acting as a secondary coordination layer.
+- `redis/RedisDistributedLock` — provides distributed mutual exclusion during execution, preventing duplicate work across nodes.
+
+---
 
 ## Claim-Based Execution Pipeline
 
@@ -131,95 +138,94 @@ This prevents:
 - Abuse of internal execution paths
 - Corruption caused by malformed requests
 
+---
+
 ### 2. Atomic Database Claim
 
 Before any work is performed, the system attempts to **claim the task at the database level** by transitioning:
-
 ```
-QUEUED → IN_PROGRESS
+QUEUED → INPROGRESS
 ```
 
 This transition:
-
-- Is performed in a single conditional update
+- Is performed using a conditional update
 - Succeeds only if the task is still `QUEUED`
 - Increments the attempt count atomically
 
-If the update affects zero rows, execution stops immediately. Another worker has already claimed the task or its state has changed.
+If the update affects zero rows, execution halts immediately.
 
-This step is the **primary concurrency gate** and ensures that no two workers can ever execute the same task.
+This step is the **primary correctness boundary** and guarantees single ownership.
 
 ---
 
 ### 3. Redis Lock Acquisition
 
-After successfully claiming the task in the database, the runtime acquires a **Redis distributed lock** for the task.
+After successfully claiming the task, the runtime acquires a **Redis distributed lock**.
 
 This lock:
-- Protects execution across nodes
-- Automatically expires via TTL
-- Is owned via a unique token
-- Is safely released using Lua scripting
+- Coordinates execution across JVMs
+- Uses TTL-based expiration
+- Is protected by a unique token
+- Is released safely using a Lua script
 
-If the lock cannot be acquired, the task is returned to `QUEUED` and execution halts. Correctness is always favored over progress.
+If the lock cannot be acquired:
+- The task is reverted to `QUEUED`
+- Execution halts immediately
+
+Redis is **never treated as a source of truth**, only as a coordination mechanism.
 
 ---
 
 ### 4. Domain Mapping
 
-Once ownership is secured, the persisted `TaskEntity` is mapped into an in-memory domain `Task` model.
+Once ownership is secured, the persisted `TaskEntity` is mapped into an in-memory domain `Task`.
 
-This preserves a clean separation between:
+This preserves separation between:
 - Persistence concerns
-- Execution logic
-- Handler implementation
+- Execution orchestration
+- Handler behavior
 
-Handlers never operate directly on persistence objects.
+Handlers never mutate persistence state directly.
 
 ---
 
 ### 5. Timed Handler Execution
 
-Handler execution is wrapped in a **Micrometer timer**, allowing:
-- Precise latency measurement
-- Failure-aware timing
-- Accurate observability under load
+Handler execution is wrapped in a **Micrometer timer**, enabling:
+- Latency tracking
+- Failure-aware measurement
+- Accurate throughput analysis
 
-Handlers are intentionally simple:
-- They perform work
-- They throw exceptions on failure
-- They do not manage retries or persistence
-
-This keeps execution logic deterministic and testable.
+Handlers:
+- Perform work
+- Throw exceptions on failure
+- Do not manage retries, persistence, or scheduling
 
 ---
 
 ### 6. Deterministic Completion or Failure
 
-On successful execution:
-- Task state transitions to `COMPLETED`
-- Results are persisted
+On success:
+- Status transitions to `COMPLETED`
+- State is persisted
 - Redis cache is synchronized
 - Metrics are updated
 
 On failure:
-- Task transitions to `FAILED`
+- Status transitions to `FAILED`
 - State is persisted immediately
 - Retry policy is evaluated centrally
 
-All outcomes are explicit, persisted, and observable.
+No implicit state changes occur.
 
 ---
 
 ### 7. Guaranteed Cleanup
 
-Regardless of success or failure:
-
+Regardless of outcome:
 - Redis locks are released in a `finally` block
-- No lock leaks are possible
-- Execution threads return to the pool cleanly
-
-This guarantees runtime safety even under unexpected exceptions.
+- Executors remain clean
+- No coordination leaks are possible
 
 ---
 
@@ -228,118 +234,77 @@ This guarantees runtime safety even under unexpected exceptions.
 Retries in SpringQueuePro are **policy-driven**, not handler-driven.
 
 Handlers never:
-
 - Re-enqueue tasks
 - Modify retry counts
 - Decide backoff timing
 
-Instead, `ProcessingService` centrally enforces retry behavior:
+Instead, `ProcessingService` enforces:
+- Retry limits
+- Exponential backoff
+- Safe re-queuing via scheduled submission
+- Explicit permanent failure handling
 
-- Failed tasks are evaluated against retry limits
-- Exponential backoff is computed deterministically
-- Tasks are transitioned back to `QUEUED`
-- Re-submission is scheduled via a controlled scheduler
-
-This design:
-
-- Prevents retry storms
-- Avoids synchronized retries
-- Mirrors cloud-native retry patterns
-- Keeps execution logic predictable
-
-Permanent failures are recorded explicitly and never retried implicitly.
+This prevents:
+- Retry storms
+- Handler complexity
+- Non-deterministic behavior
 
 ---
 
 ## Worker Runtime Observability
 
-SpringQueuePro treats observability as a **first-class runtime concern**.
-
-The execution layer exposes:
-
-- Active vs idle worker counts
-- In-flight execution metrics
+Runtime execution exposes:
+- Executor active vs idle counts
+- In-flight task metrics
 - Per-task execution timing
 - Success, failure, and retry counters
 - A bounded in-memory execution event log
 
-This allows operators to:
-
-- Inspect system behavior without backend logs
-- Understand throughput and bottlenecks
-- Diagnose retry patterns
-- Verify worker saturation levels
-
-Observability is built into the runtime—not retrofitted after the fact.
+Observability is embedded directly into the runtime layer.
 
 ---
 
 ## Steps Taken to Mimic Production Quality
 
-SpringQueuePro’s execution model reflects real-world production systems in several important ways.
-
 ### 1. Stateless Execution Units
 
-Execution threads:
+Threads:
 - Own no business state
 - Are freely replaceable
-- Can scale horizontally
-
-Correctness does not depend on thread identity.
+- Can be scaled horizontally
 
 ---
 
 ### 2. Persistence-Driven Correctness
 
-All execution decisions are gated by:
-- Database state
-- Explicit transitions
-- Durable records
-
-Threads execute **only after authority is established**.
+Execution occurs **only after authority is established in the database**.
 
 ---
 
 ### 3. Defense-in-Depth Concurrency Control
 
-Concurrency is enforced through:
+Concurrency is enforced via:
 - Atomic database transitions
-- Distributed Redis locks
+- Redis distributed locks
 - Explicit failure handling
-
-No single mechanism is trusted in isolation.
 
 ---
 
 ### 4. Centralized Retry Policy
 
-Retries are:
-- Declarative
-- Observable
-- Consistent across task types
-
-This prevents handler complexity and unpredictable behavior.
+Retries are consistent, observable, and predictable.
 
 ---
 
 ### 5. Safe Shutdown Semantics
 
-Executors are shut down explicitly using lifecycle hooks, ensuring:
-- Clean application termination
-- No orphaned threads
-- Predictable behavior in containerized environments
+Executors are shut down explicitly via lifecycle hooks, ensuring clean termination.
 
 ---
 
 ### 6. Horizontal Scalability Readiness
 
-Because:
-- Tasks are identified by ID
-- Ownership is persisted
-- Locks are distributed
-- Workers are stateless
-
-SpringQueuePro can scale across nodes without architectural change.
+The architecture supports horizontal scaling without redesign.
 
 ---
 
@@ -359,7 +324,5 @@ SpringQueuePro achieves **deterministic, production-grade task execution** under
 In short:
 
 > **Workers execute, Redis coordinates, PostgreSQL decides — and ProcessingService orchestrates everything in between.**
-
-This execution model is what allows SpringQueuePro to remain correct, debuggable, and scalable as system complexity grows.
 
 ---
