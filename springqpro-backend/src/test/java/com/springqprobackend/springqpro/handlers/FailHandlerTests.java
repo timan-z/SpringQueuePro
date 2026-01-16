@@ -1,5 +1,7 @@
 package com.springqprobackend.springqpro.handlers;
 
+// 2026-01-16-NOTE: Reinforcing the comment below; handlers just simulate worktime nothing else (deprecating this file).
+
 // 2025-11-30-NOTE: Basically shouldn't be testing Handlers anymore. This is kept for my documentation stuff.
 
 /* NOTE: Testing my FailHandler implementation of the TaskHandler class is a little bit tricky.
@@ -30,6 +32,7 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
+@Deprecated
 @ExtendWith(MockitoExtension.class)
 public class FailHandlerTests {
     @Mock

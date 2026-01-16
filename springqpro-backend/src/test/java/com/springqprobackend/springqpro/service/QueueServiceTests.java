@@ -35,6 +35,7 @@ import static org.mockito.Mockito.*;
 - HandlerRegistry fallback — test that when no handler exists, the default handler runs.
 */
 
+@Deprecated
 @ExtendWith(MockitoExtension.class)
 public class QueueServiceTests {
 

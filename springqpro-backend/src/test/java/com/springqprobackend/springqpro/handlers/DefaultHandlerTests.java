@@ -14,44 +14,46 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /* NOTE: I basically only have two types of Handlers defined as of this moment.
 The variation you see in DefaultHandler mimicked across other Handlers w/ different sleep times.
 -- Picking DefaultHandler specifically since it's the *default* Handler I'll always have regardless of refactoring, etc.
 */
 @ExtendWith(MockitoExtension.class)
-public class DefaultHandlerTests {
-    private Sleeper fastSleeper;
-    private DefaultHandler handler;
-    private Task t;
+class DefaultHandlerTests {
+
+    @Mock
+    private Sleeper sleeper;
 
     @Mock
     private TaskHandlerProperties props;
 
+    private DefaultHandler handler;
+
+    private Task task;
+
     @BeforeEach
     void setUp() {
-        /* NOTE: Very important is the line of code beneath this comment!
-        We're basically overriding the "RealSleeper" implementation of the Sleeper interface here
-        by using fastSleeper instead. Below is a lambda expression that implements Sleeper (functional interface),
-        which says that this Sleeper implementation takes some "long" var and just does nothing (doesn't actually sleep).
-        So we essentially skip the .sleep part of the Handler execution and skip straight to the followup logic. */
-        fastSleeper = millis -> {};
         when(props.getDefaultSleepTime()).thenReturn(2000L);
-        handler = new DefaultHandler(fastSleeper, props);
-        t = new Task();
-        t.setId("Task-ArbitraryTaskId");
-        t.setType(TaskType.valueOf("TEST"));
+        handler = new DefaultHandler(sleeper, props);
+
+        task = new Task();
+        task.setId("Task-ArbitraryTaskId");
+        task.setType(TaskType.EMAIL);
     }
 
-    /* 2025-11-20-EDIT: This file and DefaultHandlerTests.java is outdated, relying on the old project architecture
-    before any of the refactoring related to ProcessingService.java */
-    @Disabled
     @Test
-    void handle_shouldSet_TaskCompleted() throws InterruptedException {
-        handler.handle(t);
-        assertEquals(TaskStatus.COMPLETED, t.getStatus());
+    void handle_shouldInvokeSleeperWithConfiguredDelay() throws InterruptedException {
+        handler.handle(task);
+
+        verify(sleeper).sleep(2000L);
+    }
+
+    @Test
+    void handle_shouldNotThrow() {
+        assertDoesNotThrow(() -> handler.handle(task));
     }
 }

@@ -7,10 +7,13 @@ mocking the handlers themselves). */
 import com.springqprobackend.springqpro.handlers.TaskHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
@@ -19,44 +22,48 @@ import static org.mockito.Mockito.mock;
 - Returns DefaultHandler if type is missing.
 - getAllHandlers() exposes all of the handlers.
 */
-public class TaskHandlerRegistryTests {
+class TaskHandlerRegistryTests {
+
+    @Mock
     private TaskHandler defaultHandler;
-    private Map<String, TaskHandler> map;
 
     @BeforeEach
     void setUp() {
-        defaultHandler = mock(TaskHandler.class);
-        //map = Map.of("DEFAULT", defaultHandler);
-        map = new HashMap<>();
-        map.put("DEFAULT", defaultHandler);
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
-    void getHandler_returns_correctHandler() {
+    void getHandler_returnsCorrectHandler_whenHandlerExists() {
         TaskHandler emailHandler = mock(TaskHandler.class);
-        /*TaskHandler defaultHandler = mock(TaskHandler.class);
-        Map<String, TaskHandler> map = Map.of(
-                "EMAIL", emailHandler,
-                "DEFAULT", defaultHandler
-        );*/
-        map.put("EMAIL", emailHandler);
-        TaskHandlerRegistry registry = new TaskHandlerRegistry(map);
-        assertEquals(emailHandler, registry.getHandler("EMAIL"));
+
+        Map<String, TaskHandler> handlers = new HashMap<>();
+        handlers.put("DEFAULT", defaultHandler);
+        handlers.put("EMAIL", emailHandler);
+
+        TaskHandlerRegistry registry = new TaskHandlerRegistry(handlers);
+
+        assertThat(registry.getHandler("EMAIL")).isEqualTo(emailHandler);
     }
 
     @Test
-    void unknownHandler_defaultsTo_defaultHandler() {
-        /*TaskHandler defaultHandler = mock(TaskHandler.class);
-        Map<String, TaskHandler> map = Map.of(
+    void getHandler_fallsBackToDefault_whenHandlerIsUnknown() {
+        Map<String, TaskHandler> handlers = Map.of(
                 "DEFAULT", defaultHandler
-        );*/
-        TaskHandlerRegistry registry = new TaskHandlerRegistry(map);
-        assertEquals(defaultHandler, registry.getHandler("IDONTKNOW"));
+        );
+
+        TaskHandlerRegistry registry = new TaskHandlerRegistry(handlers);
+
+        assertThat(registry.getHandler("IDONTKNOW")).isEqualTo(defaultHandler);
     }
 
     @Test
-    void getAllHandlers_returns_injectedMap() {
-        TaskHandlerRegistry registry = new TaskHandlerRegistry(map);
-        assertEquals(map, registry.getAllHandlers());
+    void getAllHandlers_returnsInjectedHandlerMap() {
+        Map<String, TaskHandler> handlers = Map.of(
+                "DEFAULT", defaultHandler
+        );
+
+        TaskHandlerRegistry registry = new TaskHandlerRegistry(handlers);
+
+        assertThat(registry.getAllHandlers()).isEqualTo(handlers);
     }
 }

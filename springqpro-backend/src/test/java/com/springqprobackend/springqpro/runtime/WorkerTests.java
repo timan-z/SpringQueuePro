@@ -14,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+// 2026-01-16-NOTE: Completely outdated.
+
 /* NOTE: This function got much simpler after adding the TaskHandlerRegistry and global exception
 handler. Writing tests should be relatively simple.
 Again:
@@ -21,6 +23,7 @@ Again:
 */
 // commit test
 
+@Deprecated
 @ExtendWith(MockitoExtension.class)
 public class WorkerTests {
     @Mock
