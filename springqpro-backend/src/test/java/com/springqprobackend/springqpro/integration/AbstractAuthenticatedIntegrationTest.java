@@ -1,9 +1,12 @@
 package com.springqprobackend.springqpro.integration;
 
+import com.springqprobackend.springqpro.repository.UserRepository;
 import com.springqprobackend.springqpro.security.dto.AuthResponse;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -14,6 +17,18 @@ import java.util.Map;
 public abstract class AbstractAuthenticatedIntegrationTest extends IntegrationTestBase {
     @Autowired
     protected WebTestClient webTestClient;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private StringRedisTemplate redis;
+
+    @BeforeEach
+    void cleanAuthState() {
+        userRepository.deleteAll();
+        redis.getConnectionFactory().getConnection().serverCommands().flushAll();
+    }
 
     // auth helper methods
     protected void register(String email, String password) {
