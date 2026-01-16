@@ -31,6 +31,13 @@ causes ProcessingService to schedule a retry (and that attempts are incremented,
 - FailHandler is overridden so its handle() method throws immediately, this was done for deterministic test behavior.
 */
 
+/* NOTE: As of 2026-01-16 -- this test file is effectively obsolete. Its tests test for
+outdated architectural behavior. Everything that it could test is covered by
+- CreateAndProcessTaskIntegrationTest
+- RedisDistributedLockIntegrationTest
+- ProcessingConcurrencyIntegrationTest
+*/
+
 /* NOTE(S)-TO-SELF:
 - @TestConfiguration is a specialized version of @Configuration designed specifically for defining beans
 and customizations in a test environment. Meant to provide test-specific configurations without interfering
@@ -55,6 +62,7 @@ with it directly in your test methods. [And all of this on @SpyBean was taken fr
         properties = "spring.main.allow-bean-definition-overriding=true"
 )
 @Tag("disable_temp")
+@Deprecated
 class RetryBehaviorIntegrationTest extends IntegrationTestBase {
     // Field(s):
     private static final Logger logger = LoggerFactory.getLogger(RetryBehaviorIntegrationTest.class);

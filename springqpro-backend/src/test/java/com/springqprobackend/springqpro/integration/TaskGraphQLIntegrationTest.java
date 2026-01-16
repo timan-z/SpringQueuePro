@@ -1,7 +1,9 @@
 package com.springqprobackend.springqpro.integration;
 
 import java.time.Instant;
+import java.util.List;
 
+import com.springqprobackend.springqpro.security.dto.AuthResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,9 @@ import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.repository.UserRepository;
 import com.springqprobackend.springqpro.security.JwtUtil;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.*;
 
 /* 2025-11-17-NOTE(S)-TO-SELF:
 - GraphQlTester is Spring's testing utility for GraphQL endpoints.
@@ -59,13 +64,7 @@ TO-DO: FIX THIS PROBLEM PLEASE FOR THE LOVE OF GOD.
         }
 )
 @ActiveProfiles("test")
-@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
-class TaskGraphQLIntegrationTest extends IntegrationTestBase {
-
-    private GraphQlTester graphQlTester;
-
-    @LocalServerPort
-    private int port;
+class TaskGraphQLIntegrationTest extends AbstractAuthenticatedIntegrationTest {
 
     @Autowired
     private TaskRepository taskRepository;
@@ -73,208 +72,186 @@ class TaskGraphQLIntegrationTest extends IntegrationTestBase {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
     private static final String TEST_EMAIL = "graphql-test@example.com";
+    private static final String PASSWORD = "password";
 
     @BeforeEach
-    void init() {
+    void setup() {
         taskRepository.deleteAll();
         userRepository.deleteAll();
-        // Create a user so SecurityContext + ownership is valid
-        userRepository.save(new UserEntity(
-                TEST_EMAIL,
-                "{noop}password" // password not used here; we just need a valid user record
+    }
+
+    // Test #1: createTask + fetch by id
+    @Test
+    void createTask_thenQueryById_returnsCorrectTask() {
+        AuthResponse auth = registerAndLogin(TEST_EMAIL, PASSWORD);
+
+        String createMutation = """
+                mutation {
+                  createTask(input: {
+                    payload: "send-an-email"
+                    type: EMAIL
+                  }) {
+                    id
+                    payload
+                    type
+                    status
+                  }
+                }
+                """;
+
+        AtomicReference<String> taskIdRef = new AtomicReference<>();
+
+        graphQLWithToken(auth.accessToken(), createMutation)
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.createTask.id")
+                .value(id -> taskIdRef.set((String) id))
+                .jsonPath("$.data.createTask.payload").isEqualTo("send-an-email")
+                .jsonPath("$.data.createTask.type").isEqualTo("EMAIL")
+                .jsonPath("$.data.createTask.status").isEqualTo("QUEUED");
+
+        String taskId = taskIdRef.get();
+
+        String query = """
+                query {
+                  task(id: "%s") {
+                    id
+                    payload
+                    type
+                    status
+                  }
+                }
+                """.formatted(taskId);
+
+        graphQLWithToken(auth.accessToken(), query)
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.task.id").isEqualTo(taskId)
+                .jsonPath("$.data.task.payload").isEqualTo("send-an-email")
+                .jsonPath("$.data.task.type").isEqualTo("EMAIL");
+    }
+
+    // Test #2: updateTask reflects in DB + query
+    @Test
+    void updateTask_updatesDatabase_andQueryReflectsChange() {
+        AuthResponse auth = registerAndLogin(TEST_EMAIL, PASSWORD);
+
+        TaskEntity task = new TaskEntity(
+                "Task-Update-1",
+                "original payload",
+                TaskType.EMAIL,
+                TaskStatus.QUEUED,
+                0,
+                3,
+                Instant.now(),
+                TEST_EMAIL
+        );
+        taskRepository.save(task);
+
+        String mutation = """
+                mutation {
+                  updateTask(input: {
+                    id: "%s"
+                    status: COMPLETED
+                    attempts: 1
+                  }) {
+                    id
+                    status
+                    attempts
+                  }
+                }
+                """.formatted(task.getId());
+
+        graphQLWithToken(auth.accessToken(), mutation)
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.updateTask.status").isEqualTo("COMPLETED")
+                .jsonPath("$.data.updateTask.attempts").isEqualTo(1);
+
+        TaskEntity updated = taskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(TaskStatus.COMPLETED);
+        assertThat(updated.getAttempts()).isEqualTo(1);
+    }
+
+    // Test #3: deleteTask removes entity
+    @Test
+    void deleteTask_removesTaskFromDatabase() {
+        AuthResponse auth = registerAndLogin(TEST_EMAIL, PASSWORD);
+
+        TaskEntity task = new TaskEntity(
+                "Task-Delete-1",
+                "to delete",
+                TaskType.EMAIL,
+                TaskStatus.QUEUED,
+                0,
+                3,
+                Instant.now(),
+                TEST_EMAIL
+        );
+        taskRepository.save(task);
+
+        String mutation = """
+                mutation {
+                  deleteTask(id: "%s")
+                }
+                """.formatted(task.getId());
+
+        graphQLWithToken(auth.accessToken(), mutation)
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.deleteTask").isEqualTo(true);
+
+        assertThat(taskRepository.findById(task.getId())).isEmpty();
+    }
+
+    // Test #4: filter tasks by status
+    @Test
+    void tasksQuery_filtersByStatus() {
+        AuthResponse auth = registerAndLogin(TEST_EMAIL, PASSWORD);
+
+        taskRepository.saveAll(List.of(
+                new TaskEntity("t1", "a", TaskType.EMAIL, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL),
+                new TaskEntity("t2", "b", TaskType.EMAIL, TaskStatus.COMPLETED, 1, 3, Instant.now(), TEST_EMAIL),
+                new TaskEntity("t3", "c", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
         ));
-        // Generate a valid JWT for that user
-        String token = jwtUtil.generateAccessToken(TEST_EMAIL);
 
-        WebTestClient client = WebTestClient.bindToServer()
-                .baseUrl("http://localhost:" + port + "/graphql")
-                .exchangeStrategies(
-                        ExchangeStrategies.builder()
-                                .codecs(c -> c.defaultCodecs().maxInMemorySize(5_000_000))
-                                .build()
-                )
-                .defaultHeader("Authorization", "Bearer " + token)
-                .build();
-        this.graphQlTester = HttpGraphQlTester.create(client);
-    }
-
-    // Test #1 - Create Task, Query the Task, then verify its Status, Type, and Payload:
-    @Test
-    void taskCreation_succeeds_isRetrieved() {
-        String mutation = """
-                mutation {
-                    createTask(input:{
-                        payload:"send-an-email"
-                        type:EMAIL
-                    }) {
-                        id
-                        payload
-                        type
-                        status
-                        attempts
-                        maxRetries
-                    }
-                }
-                """;
-        /*2025 - 11 - 17 - NOTE(S) - TO - SELF:+DEBUG:
-        -graphQlTester.document(mutation) prepares a GraphQL mutation with String mutation, which is just a String
-        containing
-        a proper GraphQL mutation obv.So graphQlTester runs it by running my actual Spring Boot app(which runs my real
-                GraphQL controller, my real service layer, and uses the real database(Testcontainers in this
-        case)).
-        - .execute() clearly runs it and you can inspect the fields.*/
-        var created = graphQlTester.document(mutation)
-            .execute()
-            .path("createTask.payload").entity(String.class).isEqualTo("send-an-email")
-            .path("createTask.type").entity(String.class).isEqualTo("EMAIL")
-            .path("createTask.status").entity(String.class).isEqualTo("QUEUED");
-        // Extract the id from the same GraphQL mutation:
-        String id = graphQlTester.document(mutation)
-                .execute()
-                .path("createTask.id").entity(String.class).get();
-        // Search for that Task w/ a GraphQL query:
         String query = """
                 query {
-                    task(id: "%s") {
-                        id
-                        payload
-                        type
-                        status
-                    }
-                }
-                """.formatted(id);
-        graphQlTester.document(query)
-                .execute()
-                .path("task.payload").entity(String.class).isEqualTo("send-an-email")
-                .path("task.type").entity(String.class).isEqualTo("EMAIL");
-    }
-
-    // Test #2 - Update Task (Partially), Verify Change in DB, Query Returns Updated:
-    @Test
-    void updateTask_verifyDBChange_retrieveByQuery() {
-        TaskEntity entity = new TaskEntity(
-                "Task-ArbitraryTaskId",
-                "Send an email",
-                TaskType.EMAIL,
-                TaskStatus.QUEUED,
-                0,
-                3,
-                Instant.now(),
-                TEST_EMAIL
-        );
-        taskRepository.save(entity);
-        // Manually change the status of entity to COMPLETED and increment attempts:
-        // NOTE: When you want to specify integer in mutation, put %d -- "%d" will return you a integer wrapped in a String (aka just a String)
-        String mutation = """
-                mutation {
-                    updateTask(input:{
-                        id:"%s",
-                        status:COMPLETED,
-                        attempts:%d
-                    }) {
-                        id
-                        status
-                        attempts
-                    }
-                }
-                """.formatted(entity.getId(), entity.getAttempts()+1);
-        graphQlTester.document(mutation).execute()
-                .path("updateTask.status").entity(String.class).isEqualTo("COMPLETED")
-                .path("updateTask.attempts").entity(Integer.class).isEqualTo(1);
-        // Verify that the change happened in the DataBase w/ taskRepository:
-        TaskEntity getEntity = taskRepository.findById(entity.getId()).orElseThrow();
-        assert getEntity.getStatus() == TaskStatus.COMPLETED;
-        assert getEntity.getAttempts() == entity.getAttempts() + 1;
-    }
-
-    // Test #3 - Delete Task, Verify Change in DB, Query Returns NULL (or whatever):
-    @Test
-    void deleteTask_verifyDBChange_queryRetrieveNull() {
-        TaskEntity entity = new TaskEntity(
-                "Task-ArbitraryTaskId",
-                "Send an email",
-                TaskType.EMAIL,
-                TaskStatus.QUEUED,
-                0,
-                3,
-                Instant.now(),
-                TEST_EMAIL
-        );
-        taskRepository.save(entity);
-        String mutation = """
-                mutation {
-                    deleteTask(id:"%s")
-                }
-                """.formatted(entity.getId());
-        graphQlTester.document(mutation)
-                .execute()
-                .path("deleteTask").entity(Boolean.class).isEqualTo(true);
-        assert taskRepository.findById(entity.getId()).isEmpty();
-    }
-
-    // Test #4 - Being able to filter Tasks w/ Status:
-    @Test
-    void filterTasks_byStatusQuery_returnsCorrectList() {
-        // Task #1:
-        taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-1","Send an email", TaskType.EMAIL, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
-        );
-        // Task #2:
-        taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-2", "Send an email 2", TaskType.EMAIL, TaskStatus.COMPLETED, 1, 3, Instant.now(), TEST_EMAIL)
-        );
-        // Task #3:
-        taskRepository.save(
-                new TaskEntity("Task-ArbitaryTaskId-3", "Send an SMS or whatever", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
-        );
-        String query = """
-                query {
-                    tasks(status: QUEUED) {
-                        id
-                        payload
-                        status
-                    }
+                  tasks(status: QUEUED) {
+                    id
+                  }
                 }
                 """;
-        graphQlTester.document(query)
-                .execute()
-                .path("tasks").entityList(TaskEntity.class).hasSize(2);
+
+        graphQLWithToken(auth.accessToken(), query)
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.tasks.length()").isEqualTo(2);
     }
 
-    // Test #5 - Being able to filter Tasks w/ Type:
+    // Test #5: filter tasks by type
     @Test
-    void filterTasks_byTypeQuery_returnsCorrectList() {
-        // Task #1:
-        taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-1","Do something NEWSLETTER related, I don't know.", TaskType.NEWSLETTER, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
-        );
-        // Task #2:
-        taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-2", "Do something NEWSLETTER related, I don't know 2.", TaskType.NEWSLETTER, TaskStatus.COMPLETED, 1, 3, Instant.now(), TEST_EMAIL)
-        );
-        // Task #3:
-        taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-3", "Send an SMS or whatever", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
-        );
-        // Task #4:
-        taskRepository.save(
-                new TaskEntity("Task-ArbitraryTaskId-4", "Do something NEWSLETTER related, I don't know 3.", TaskType.NEWSLETTER, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
-        );
+    void tasksTypeQuery_filtersByType() {
+        AuthResponse auth = registerAndLogin(TEST_EMAIL, PASSWORD);
+
+        taskRepository.saveAll(List.of(
+                new TaskEntity("t1", "n1", TaskType.NEWSLETTER, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL),
+                new TaskEntity("t2", "n2", TaskType.NEWSLETTER, TaskStatus.COMPLETED, 1, 3, Instant.now(), TEST_EMAIL),
+                new TaskEntity("t3", "s1", TaskType.SMS, TaskStatus.QUEUED, 0, 3, Instant.now(), TEST_EMAIL)
+        ));
+
         String query = """
                 query {
-                    tasksType(type: NEWSLETTER) {
-                        id
-                        payload
-                        status
-                    }
+                  tasksType(type: NEWSLETTER) {
+                    id
+                  }
                 }
                 """;
-        graphQlTester.document(query)
-                .execute()
-                .path("tasksType").entityList(TaskEntity.class).hasSize(3);
+
+        graphQLWithToken(auth.accessToken(), query)
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.tasksType.length()").isEqualTo(2);
     }
 }
