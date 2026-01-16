@@ -18,7 +18,7 @@ public abstract class AbstractAuthenticatedIntegrationTest extends IntegrationTe
     @Autowired
     protected WebTestClient webTestClient;
 
-    @Autowired
+    /*@Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -28,7 +28,7 @@ public abstract class AbstractAuthenticatedIntegrationTest extends IntegrationTe
     void cleanAuthState() {
         userRepository.deleteAll();
         redis.getConnectionFactory().getConnection().serverCommands().flushAll();
-    }
+    }*/
 
     // auth helper methods
     protected void register(String email, String password) {

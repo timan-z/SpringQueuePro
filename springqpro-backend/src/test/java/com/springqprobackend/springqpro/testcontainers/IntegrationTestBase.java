@@ -1,7 +1,11 @@
 package com.springqprobackend.springqpro.testcontainers;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -21,6 +25,18 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @ActiveProfiles("test")
 public abstract class IntegrationTestBase {
+    @Autowired
+    protected JdbcTemplate jdbc;
+
+    @Autowired
+    protected StringRedisTemplate redis;
+
+    @BeforeEach
+    void cleanDatabase() {
+        jdbc.execute("TRUNCATE TABLE tasks RESTART IDENTITY CASCADE");
+        jdbc.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
+        redis.getConnectionFactory().getConnection().serverCommands().flushAll();
+    }
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
