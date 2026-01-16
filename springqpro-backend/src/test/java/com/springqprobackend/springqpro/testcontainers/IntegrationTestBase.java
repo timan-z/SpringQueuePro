@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.jdbc.Sql;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -24,19 +25,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.main.allow-bean-definition-overriding=true")
 @Testcontainers
 @ActiveProfiles("test")
+@Sql(
+        scripts = "/cleanup.sql",
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 public abstract class IntegrationTestBase {
-    @Autowired
-    protected JdbcTemplate jdbc;
-
-    @Autowired
-    protected StringRedisTemplate redis;
-
-    @BeforeEach
-    void cleanDatabase() {
-        jdbc.execute("TRUNCATE TABLE tasks RESTART IDENTITY CASCADE");
-        jdbc.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
-        redis.getConnectionFactory().getConnection().serverCommands().flushAll();
-    }
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
