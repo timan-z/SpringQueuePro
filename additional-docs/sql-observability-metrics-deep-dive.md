@@ -100,7 +100,7 @@ Nothing is implicitly auto-generated or inferred.
 SpringQueuePro tracks the **full lifecycle of task execution** using monotonic counters:
 
 - **`springqpro_tasks_submitted_total`**
-  Incremented when a task enters the system.
+  Incremented when a task is submitted for processing.
 
 - **`springqpro_tasks_claimed_total`**
   Incremented only after a task is *successfully claimed* via an atomic database transition.
@@ -148,22 +148,6 @@ This counter distinguishes:
 
 This separation becomes important in multi-client or multi-ingress systems.
 
-### Legacy & Transitional Metrics
-
-Some metrics exist for transparency during architectural evolution:
-
-- **`springqpro_queue_enqueue_total`**
-- **`springqpro_queue_enqueue_by_id_total`**
-- **`springqpro_queue_memory_size` (Gauge)**
-
-These reflect:
-
-- legacy in-memory queue paths
-- transitional execution models
-- historical debugging needs
-
-They are intentionally preserved but clearly labeled to avoid confusion.
-
 ## Worker Runtime Visibility
 
 SpringQueuePro exposes **worker runtime state** directly from the `ThreadPoolExecutor`.
@@ -171,7 +155,7 @@ SpringQueuePro exposes **worker runtime state** directly from the `ThreadPoolExe
 Rather than guessing or inferring worker behavior, the system reports:
 
 - active worker count
-- idle worker count
+- idle/queued worker count
 - in-flight task count
 
 This data is exposed via:

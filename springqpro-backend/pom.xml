@@ -183,6 +183,9 @@
                 <version>3.2.5</version>
                 <configuration>
                     <excludedGroups>disable_temp</excludedGroups>
+                    <systemPropertyVariables>
+                        <spring.profiles.active>test</spring.profiles.active>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
         </plugins>
