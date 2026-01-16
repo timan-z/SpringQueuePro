@@ -26,7 +26,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {
+                "app.queue.processing.enabled=false",
+                "spring.task.scheduling.enabled=false"
+        })
 @ActiveProfiles("test")
 public class OwnershipGraphQLIntegrationTest extends AbstractAuthenticatedIntegrationTest {
     // For the tests:

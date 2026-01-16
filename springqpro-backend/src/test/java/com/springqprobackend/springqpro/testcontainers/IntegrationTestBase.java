@@ -37,13 +37,15 @@ public abstract class IntegrationTestBase {
                     .withDatabaseName("springqpro")
                     .withUsername("springqpro")
                     .withPassword("springqpro")
-                    .withReuse(true);
+                    .withReuse(false);
+                    //.withReuse(true);
 
     @Container
     static final GenericContainer<?> REDIS =
             new GenericContainer<>("redis:7-alpine")
                     .withExposedPorts(6379)
-                    .withReuse(true);
+                    .withReuse(false);
+                    //.withReuse(true);
 
     @DynamicPropertySource
     static void registerDynamicProps(DynamicPropertyRegistry registry) {
