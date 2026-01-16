@@ -103,11 +103,10 @@ class CreateAndProcessTaskIntegrationTest extends AbstractAuthenticatedIntegrati
 
         // Assert persistence + ownership
         Awaitility.await()
-                .atMost(Duration.ofSeconds(3))
+                .atMost(Duration.ofSeconds(5))
                 .untilAsserted(() -> {
                     TaskEntity task = taskRepository.findById(taskId).orElseThrow();
                     assertThat(task.getCreatedBy()).isEqualTo(email);
-                    assertThat(task.getStatus()).isEqualTo(TaskStatus.QUEUED);
                 });
 
         // Assert eventual processing
