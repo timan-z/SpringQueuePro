@@ -20,6 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -80,7 +81,9 @@ public class OwnershipGraphQLIntegrationTest extends AbstractAuthenticatedIntegr
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.data.tasks[*].id")
-                .value(ids -> assertThat((Iterable<?>) ids).contains(aliceTaskId));
+                .value(ids -> {
+                    List<String> idList = (List<String>) ids;
+                    assertThat(idList).contains(aliceTaskId); });
 
         // Simon does NOT see Alice's task
         graphQLWithToken(simon.accessToken(), """
@@ -93,7 +96,9 @@ public class OwnershipGraphQLIntegrationTest extends AbstractAuthenticatedIntegr
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.data.tasks[*].id")
-                .value(ids -> assertThat((Iterable<?>) ids).doesNotContain(aliceTaskId));
+                .value(ids -> {
+                        List<String> idList = (List<String>) ids;
+                assertThat(idList).doesNotContain(aliceTaskId); });
     }
 
     @Test
@@ -167,8 +172,10 @@ public class OwnershipGraphQLIntegrationTest extends AbstractAuthenticatedIntegr
               retryTask(id: "%s")
             }
         """.formatted(aliceTaskId))
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.data.retryTask").isEqualTo(false);
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.data").isEqualTo(null)
+                    .jsonPath("$.errors").isArray()
+                    .jsonPath("$.errors.length()").isEqualTo(1);
     }
 }

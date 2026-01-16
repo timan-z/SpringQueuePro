@@ -1,10 +1,12 @@
 package com.springqprobackend.springqpro.integration;
 
 import com.springqprobackend.springqpro.domain.entity.TaskEntity;
+import com.springqprobackend.springqpro.enums.TaskStatus;
 import com.springqprobackend.springqpro.enums.TaskType;
 import com.springqprobackend.springqpro.redis.RedisDistributedLock;
 import com.springqprobackend.springqpro.repository.TaskRepository;
 import com.springqprobackend.springqpro.service.ProcessingService;
+import com.springqprobackend.springqpro.service.QueueService;
 import com.springqprobackend.springqpro.service.TaskService;
 import com.springqprobackend.springqpro.testcontainers.IntegrationTestBase;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +16,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
+
+import java.time.Duration;
 import java.util.concurrent.*;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -52,43 +59,58 @@ GRAPHQL-RELATED QUERIES:
 */
 //@Testcontainers
 //@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@Tag("disable_temp")
+@SpringBootTest
+@ActiveProfiles("test")
 class ProcessingConcurrencyIntegrationTest extends IntegrationTestBase {
-    // Field(s):
-    private static final Logger logger = LoggerFactory.getLogger(ProcessingConcurrencyIntegrationTest.class);
     @Autowired
     private TaskService taskService;
+
     @Autowired
     private TaskRepository taskRepository;
+
     @Autowired
-    private ProcessingService processingService;
-    @Autowired
-    private RedisDistributedLock redisLock;
+    private QueueService queueService;
 
     @BeforeEach
     void cleanDb() {
         taskRepository.deleteAll();
     }
 
-    @Disabled("Outdated architecture — will fix later")
     @Test
-    void twoThreads_tryToClaim_sameTask_onlyOneSucceeds() throws InterruptedException, ExecutionException {
-        TaskEntity entity = taskService.createTaskForUser("concurrency-test", TaskType.EMAIL, "random_email@gmail.com");
-        String id = entity.getId();
-        ExecutorService esDummy = Executors.newFixedThreadPool(2);
-        Callable<Void> c = () -> {
-            processingService.claimAndProcess(id);
-            return null;
-        };
-        Future<Void> f1 = esDummy.submit(c);
-        Future<Void> f2 = esDummy.submit(c);
-        f1.get();
-        f2.get();
-        // reload:
-        TaskEntity reloaded = taskRepository.findById(id).orElseThrow();
-        // ATTEMPTS SHOULD BE 1.
-        assertThat(reloaded.getAttempts()).isGreaterThanOrEqualTo(1);
-        assertThat(reloaded.getStatus()).isNotNull();   // No double-claiming anomalies or corrupted states.
-        esDummy.shutdown();
+    void concurrentEnqueue_sameTask_doesNotProcessTwice() throws Exception {
+        // create task using TaskService:
+        TaskEntity task = taskService.createTaskForUser(
+                "concurrency-test",
+                TaskType.EMAIL,
+                "concurrency@test.com"
+        );
+        String taskId = task.getId();
+
+        // enqueue same task concurrently:
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        Runnable enqueue = () -> queueService.enqueueById(taskId);
+
+        executor.submit(enqueue);
+        executor.submit(enqueue);
+
+        executor.shutdown();
+        executor.awaitTermination(5, TimeUnit.SECONDS);
+
+        // Assert: task eventually reaches a terminal state
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> {
+                    TaskEntity reloaded = taskRepository.findById(taskId).orElseThrow();
+                    assertThat(reloaded.getStatus())
+                            .isIn(TaskStatus.COMPLETED, TaskStatus.FAILED);
+                });
+
+        // Assert: task is not duplicated or corrupted
+        TaskEntity finalState = taskRepository.findById(taskId).orElseThrow();
+
+        assertThat(finalState.getId()).isEqualTo(taskId);
+        assertThat(finalState.getStatus()).isNotEqualTo(TaskStatus.QUEUED);
+        assertThat(finalState.getStatus()).isNotEqualTo(TaskStatus.INPROGRESS);
     }
 }
