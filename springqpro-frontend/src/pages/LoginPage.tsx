@@ -3,22 +3,20 @@ import { loginUser } from "../api/api.ts";
 import { useAuth } from "../utility/auth/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-/* 2025-12-02-NOTE: To be frank, I'm on a time crunch so I'm just going to be copying
-my Login Page design from my "Hack MD Clone" CMDE Project and adjusting it slightly aesthetically.
-TO-DO: Maybe replace this with a more original design later - make a new branch and overhaul the frontend
-whenever I've got the time to work on my atrocious frontend HTML/CSS skills (make this look nice).
-*/
 export default function LoginPage() {
+    // React Refs:
     const emailRef = useRef<HTMLInputElement>(null);
     const passRef = useRef<HTMLInputElement>(null);
     const signInBtnRef = useRef<HTMLButtonElement>(null);
+    // Local UI state:
     const [emailError, setEmailError] = useState(false);
     const [passwordError, setPasswordError] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
+    // External hook(s) for authentication + routing:
     const { login } = useAuth();
     const navigate = useNavigate();
 
-    // Validate fields are filled:
+    // Validate fields are filled helper (client-side guardrail):
     const checkFormsFilled = () => {
         const email = emailRef.current?.value ?? "";
         const pass = passRef.current?.value ?? "";
@@ -35,7 +33,31 @@ export default function LoginPage() {
         return true;
     };
 
-    // ENTER key submits login:
+    // Login handler (core behavior on this page):
+    const handleLogin = async(e: React.FormEvent) => {
+        e.preventDefault();
+        // Validate inputs:
+        setServerError(null);
+        if(!checkFormsFilled()) return;
+        // Read values from refs:
+        const email = emailRef.current!.value;
+        const password = passRef.current!.value;
+
+        try {
+            // Call backend and, on success, store tokens via AuthContext and navigate to the dashboard (post-auth landing page).
+            const result = await loginUser(email, password);
+            if (result.accessToken) {
+                login(result.accessToken, result.refreshToken); // localStorage of accessToken and refreshToken will take place in AuthContext.tsx
+                navigate("/token-dashboard");
+            } else {
+                setServerError("Invalid email or password.");
+            }
+        } catch {
+            setServerError("[Server/Network Error] Login failed unexpectedly. Try again.");
+        }
+    }
+
+    // UseEffect hook to handle Login submission via ENTER key:
     useEffect(() => {
         const handleEnterKey = (e: KeyboardEvent) => {
             if (e.key === "Enter") signInBtnRef.current?.click();
@@ -52,26 +74,6 @@ export default function LoginPage() {
         };
     }, []);
 
-    const handleLogin = async(e: React.FormEvent) => {
-        e.preventDefault();
-        setServerError(null);
-        if(!checkFormsFilled()) return;
-        const email = emailRef.current!.value;
-        const password = passRef.current!.value;
-
-        try {
-            const result = await loginUser(email, password);
-            if (result.accessToken) {
-                login(result.accessToken, result.refreshToken); // localStorage of accessToken and refreshToken will take place in AuthContext.tsx
-                navigate("/token-dashboard");
-            } else {
-                setServerError("Invalid email or password.");
-            }
-        } catch {
-            setServerError("[Server/Network Error] Login failed unexpectedly. Try again.");
-        }
-    }
-    
     return(
         <div style={{
             height: "100vh",
@@ -81,7 +83,6 @@ export default function LoginPage() {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            /*paddingTop: "40px"*/
         }}>
             {/* Outer-most <div> element containing the "Sign in to SoringQueuePro" box. Should be centered in the middle of the screen: */} 
             <div style={{
@@ -104,6 +105,7 @@ export default function LoginPage() {
                     <div style={{ color: "#cc0000", fontSize: "14px" }}>{serverError}</div>
                 )}
 
+                {/* The core Login form area: */}
                 <form
                     onSubmit={handleLogin}
                     style={{

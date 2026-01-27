@@ -18,8 +18,8 @@
 
     /* Linting */
     "strict": true,
-    "noUnusedLocals": false,      /* DEBUG: TEMP SET TO FALSE FOR MVP DEPLOY -- LET ME FINISH PLEASE FOR THE LOVE OF GOD */
-    "noUnusedParameters": false,  /* DEBUG: TEMP SET TO FALSE FOR MVP DEPLOY -- LET ME FINISH PLEASE FOR THE LOVE OF GOD */
+    "noUnusedLocals": true,      /* DEBUG: TEMP SET TO FALSE FOR MVP DEPLOY -- LET ME FINISH PLEASE FOR THE LOVE OF GOD */
+    "noUnusedParameters": true,  /* DEBUG: TEMP SET TO FALSE FOR MVP DEPLOY -- LET ME FINISH PLEASE FOR THE LOVE OF GOD */
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true

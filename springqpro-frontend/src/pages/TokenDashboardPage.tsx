@@ -1,25 +1,13 @@
-/* [INFORMATION]:
-I'm going to have a LoginPage.tsx and RegisterPage.tsx page. RegisterPage, upon success, redirects the user to the LoginPage.
-I want it so that if the LoginPage succeeds, it'll remap to this TokenDashboardPage.tsx page. It'll be this page that showcases:
-- Refresh Token (w/ first 16 chars... masked)
-- Refresh Token (w/ first 16 chars... masked)
-- Expiry (read from JWT Payload)
-"Token will auto-refresh when expired" <-- DEBUG: I can't remember if I have this.
-This page basically flexes the whole authentication pipeline.
-
-Have buttons for:
-- Refresh Access Token manually.
-- Logout (for invalidating refresh token via Redis). [will redirect to the LoginPage]
-- Show Redis token store status (e.g., "Active refresh token stored")
-
-TO-DO: Write a JWT Debugger file that parses JWT Payload locally and displays internal info.
-*/
-// src/pages/TokenDashboardPage.tsx
-
-/* TO-DO:
-- Can maybe map token rotation history to a User / tie to the backend at some point.
-- This can also maybe appear in one of the Metrics pages too?
-- Add a clear history button for my rotation history stuff.
+/* TokenDashboardPage.tsx:
+--------------------------
+This page is basically a read-only + light-interaction diagnostic page that visualizes the
+current authentication state (owned by AuthProvider) for this current user.
+- This page does not "own" authentication, it simply observes its state with some light interaction (invoke refresh).
+- It derives UI state directly from tokens.
+TokenDashboardPage is a data consumer, not an owner.
+***
+This is the post-login landing page that exists to give the user a peek "under the hood" as to how the 
+authentication and authorization setup works for this system (a glimpse into the backend).
 */
 
 import { useEffect, useState } from "react";
@@ -27,6 +15,18 @@ import { useAuth } from "../utility/auth/AuthContext";
 import { refreshAccessToken, getRedisTokenStatus } from "../api/api";
 import NavBar from "../components/NavBar";
 
+/* EVENTUAL TO-DO:
+- Write a JWT Debugger file that parses JWT Payload locally and displays internal info.
+- Can maybe map token rotation history to a User / tie to the backend at some point.
+- This can also maybe appear in one of the Metrics pages too?
+- Add a clear history button for my rotation history stuff.
+***
+2026-01-27-NOTE: I've made the token rotation history user-scoped on the client-side only (no PostgreSQL persistence, etc).
+The feature is entirely cosmetic, extremely misc, and purely for demo visualization purposes. In production, it would be
+backed by a user-scoped audit table, but remember that the point of this page is observability, not correctness.
+*/
+
+// Manually parsing the JWT payload instead of trusting jwt-decode:
 interface DecodedJWT {
   sub: string;
   iat: number;
@@ -36,7 +36,7 @@ interface DecodedJWT {
 }
 
 export default function TokenDashboardPage() {
-  const { accessToken, refreshToken, login } = useAuth();
+  const { accessToken, refreshToken, login } = useAuth(); // TokenDashboardPage doens't know how login works, but needed for successful Refresh.
 
   // Access Token Metadata, etc:
   const [decodedAccess, setDecodedAccess] = useState<DecodedJWT | null>(null);
@@ -50,7 +50,10 @@ export default function TokenDashboardPage() {
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null); // Token chain integrity check.
   const [rotationHistory, setRotationHistory] = useState<any[]>([]);  // Local rotation history.
 
-  // Decoding JWT:
+  // User-scoped localStorage key for rotation history (cosmetic and purely for frontend/demo purposes):
+  const rotationStorageKey = decodedAccess?.sub ? `rotationHistory:${decodedAccess.sub}` : null;
+
+  // Manual JWT decoding helper:
   const decodeJwt = (token: string): DecodedJWT | null => {
     try {
       const payload = token.split(".")[1];
@@ -66,7 +69,7 @@ export default function TokenDashboardPage() {
     if (refreshToken) setDecodedRefresh(decodeJwt(refreshToken));
   }, [accessToken, refreshToken]);
 
-  // Expiry Countdown for Access Tokens (Quality of Life stuff):
+  // Expiry Countdown for Access Tokens (cosmetic frontend stuff):
   useEffect(() => {
     if (!decodedAccess?.exp) return;
 
@@ -88,7 +91,7 @@ export default function TokenDashboardPage() {
     return () => clearInterval(timer);
   }, [decodedAccess]);
 
-  // Expiry countdown for Refresh Tokens (Quality of Life stuff):
+  // Expiry Countdown for Refresh Tokens (cosmetic frontend stuff):
   useEffect(() => {
     if (!decodedRefresh?.exp) return;
 
@@ -110,7 +113,7 @@ export default function TokenDashboardPage() {
     return () => clearInterval(timer);
   }, [decodedRefresh]);
 
-  // Redis Status Fetch:
+  // UseEffect hook for Redis Token Status Fetch:
   useEffect(() => {
     if (!accessToken || !refreshToken) return;
     const fetchStatus = async () => {
@@ -124,7 +127,12 @@ export default function TokenDashboardPage() {
     fetchStatus();
   }, [accessToken, refreshToken]);
 
-  // Token Chain Integrity Check:
+  // UseEffect hook for Token Chain Integrity Check:
+  /* NOTE: Impressive feature to highlight in interviews, etc.
+  - Demonstrates access & refresh tokens are linked.
+  - Shows rotation preserves identity.
+  - Illustrates that authentication here is a chain, not isolated tokens. (Link this to production-grade stuff).
+  */
   useEffect(() => {
     if (!decodedAccess || !decodedRefresh) return;
 
@@ -132,14 +140,14 @@ export default function TokenDashboardPage() {
     setIntegrityOk(ok);
   }, [decodedAccess, decodedRefresh]);
 
-  // Manual refresh AND rotation history:
+  // Manual Token Refresh Handler Method - This is the method that directly invokes the backend on this observability-focused page:
   const handleRefresh = async () => {
     if (!refreshToken) return;
     setRefreshing(true);
 
     const res = await refreshAccessToken(refreshToken);
     if (res.accessToken && res.refreshToken) {
-      // 2025-12-05-NOTE:+ADDITION: Now saving rotation history:
+      // Steps below are relevant to the Rotation History section:
       const historyEntry = {
         time: new Date().toLocaleString(),
         oldRefresh: refreshToken,
@@ -150,7 +158,11 @@ export default function TokenDashboardPage() {
         newHistory.shift();
       }
       setRotationHistory(newHistory);
-      localStorage.setItem("rotationHistory", JSON.stringify(newHistory));
+      if (rotationStorageKey) {
+        localStorage.setItem(rotationStorageKey, JSON.stringify(newHistory));
+      }
+
+      // Steps below are relevant to this method's main refresh functionality:
 
       // login update
       login(res.accessToken, res.refreshToken);
@@ -165,9 +177,15 @@ export default function TokenDashboardPage() {
 
   // ROTATION HISTORY ADDITION: Load history from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem("rotationHistory");
-    if (stored) setRotationHistory(JSON.parse(stored));
-  }, []);
+    if (!rotationStorageKey) return;
+
+    const stored = localStorage.getItem(rotationStorageKey);
+    if (stored) {
+      setRotationHistory(JSON.parse(stored));
+    } else {
+      setRotationHistory([]);
+    }
+  }, [rotationStorageKey]);
 
   // For masking both tokens:
   const mask = (t: string) => t.slice(0, 16) + "..." + t.slice(-8);
@@ -233,6 +251,8 @@ export default function TokenDashboardPage() {
           {decodedAccess && (
             <>
               <hr style={{ borderColor: "#6db33f" }} />
+
+              <h3 style={{ color: "#6db33f" }}>Access Token Details</h3>
 
               <b>Access Issued At:</b>{" "}
               {new Date(decodedAccess.iat * 1000).toLocaleString()}
@@ -325,20 +345,47 @@ export default function TokenDashboardPage() {
         </div>
 
         {/* ROTATION HISTORY CARD: */}
-        {rotationHistory.length > 0 && (
-          <div
-            style={{
-              width: "520px",
-              backgroundColor: "#ffffff",
-              border: "2px solid #6db33f",
-              borderRadius: "12px",
-              padding: "20px",
-              marginBottom: "40px",
-              boxShadow: "0 0 10px rgba(109,179,63,0.25)",
-            }}
-          >
-            <h2 style={{ color: "#6db33f" }}>Refresh Token Rotation History</h2>
-            <p>(Last 6 Most Recent Token Rotations)</p>
+        <div
+          style={{
+            width: "520px",
+            backgroundColor: "#ffffff",
+            border: "2px solid #6db33f",
+            borderRadius: "12px",
+            padding: "20px",
+            marginBottom: "40px",
+            boxShadow: "0 0 10px rgba(109,179,63,0.25)",
+          }}
+        >
+          <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px",}}>
+            <h2 style={{ color: "#6db33f", margin: 0 }}>
+              Refresh Token Rotation History
+            </h2>
+            {/* Button to manually clear the Refrehs Token Rotation History contents: */}
+            <button
+              onClick={() => {
+                if (rotationStorageKey) {
+                  localStorage.removeItem(rotationStorageKey);
+                  setRotationHistory([]);
+                }
+              }}
+              style={{
+                width: "75px",
+                padding: "6px 10px",
+                fontSize: "12px",
+                backgroundColor: "#f3f4f6",
+                border: "1px solid #6db33f",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontFamily: "monospace",
+              }}
+            >
+              Clear
+            </button>
+          </div>
+
+          <p>(Last 6 Most Recent Token Rotations)</p>
+
+          {rotationHistory.length > 0 && (
 
             <div style={{
               maxHeight: "180px",
@@ -358,8 +405,8 @@ export default function TokenDashboardPage() {
                 ))}
               </ul>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* NAVIGATION OVERVIEW BOX */}
         <div

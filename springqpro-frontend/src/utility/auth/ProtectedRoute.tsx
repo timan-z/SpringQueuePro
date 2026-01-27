@@ -1,3 +1,4 @@
+// ProtectedRoute.tsx - This is the authentication gatekeeper! Checks auth at render time -> render or redirect.
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";

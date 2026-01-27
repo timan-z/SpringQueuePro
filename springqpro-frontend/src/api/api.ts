@@ -1,3 +1,11 @@
+/* api.ts:
+----------
+Pretty standard stuff - this file is a thin, stateless wrapper around fetch.
+It's just the intermediary layer for frontend-to-backend interaction.
+***
+NOTE: Definitely some things to tidy up stylistically and conventions-wise (see getRedisTokenStatus comment) but low priority.
+*/
+
 export const API_BASE = import.meta.env.VITE_API_BASE.replace(/\/+$/, "");
 
 // Auth-related API calls to AuthenticationController.java in the backend:

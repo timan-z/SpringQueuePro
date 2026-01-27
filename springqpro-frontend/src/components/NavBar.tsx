@@ -1,3 +1,4 @@
+// NavBar.tsx - Component post-login on GUI that lets you logout and navigate to other frontend pages:
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../utility/auth/AuthContext.tsx";

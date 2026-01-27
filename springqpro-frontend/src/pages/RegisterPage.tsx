@@ -2,22 +2,26 @@ import React, { useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { registerUser } from "../api/api";
 
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/* 2025-12-02-NOTE: To be frank, I'm on a time crunch so I'm just going to be copying
-my Register Page design from my "Hack MD Clone" CMDE Project and adjusting it slightly aesthetically.
-TO-DO: Maybe replace this with a more original design later - make a new branch and overhaul the frontend
-whenever I've got the time to work on my atrocious frontend HTML/CSS skills (make this look nice).
+/* NOTE-TO-SELF: (for when I return to my frontend code after an absence...)
+ * - AuthContext is not used in RegisterPage.tsx (which is mainly for Login purposes w/ token identity storage).
 */
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;    // Email formatting regex (validation is purely syntax and structural).
+
 export default function RegisterPage() {
+    // React Refs:
     const emailRef = useRef<HTMLInputElement | null>(null);
     const passwordRef = useRef<HTMLInputElement | null>(null);
+    // Local UI state:
     const [emailError, setEmailError] = useState<string | null>(null);
     const [passwordError, setPasswordError] = useState<string | null>(null);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // External hook(s) for routing:
     const navigate = useNavigate();
 
+    // Helper method for setting the local UI state variables (NOTE: here, but not LoginPage.tsx, just because they're more frequently used).
+    // NOTE:+TO-DO: Maybe I can abstract this and anything else I find into a helper methods file...
     const showTransient = (
         setter: React.Dispatch<React.SetStateAction<string | null>>,
         message: string
@@ -26,7 +30,8 @@ export default function RegisterPage() {
         setTimeout(() => setter(null), 2500);
     };
 
-    // EDIT: I now realize that <input> w/ type="email" handles most of this itself, but carrying these over too anyways.
+    // Validation logic for Registration form (client-side guard to prevent unnecessary calls to the server):
+    // NOTE: I now realize that <input> w/ type="email" handles most of this itself, but carrying this over anyways.
     const validateForm = (): boolean => {
         const email = emailRef.current?.value.trim() ?? "";
         const password = passwordRef.current?.value ?? "";
@@ -49,19 +54,21 @@ export default function RegisterPage() {
         return true;
     };
 
+    // Registration Handler (core behavior on this page):
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        // Validate inputs:
         setSubmitError(null);
         if (!validateForm()) return;
-
+        // Read value from Refs:
         const email = emailRef.current!.value.trim();
         const password = passwordRef.current!.value;
 
         try {
+            // Call backend for registration and, on success, navigate to the Login page (else display error):
             setIsSubmitting(true);
             const result = await registerUser(email, password);
 
-            // Adjust this check depending on how your API wrapper is implemented
             if (result?.status === "registered") {
                 // NOTE:+TO-DO: When I have the time I want a pop-up box in the top-right or bottom-right corner that goes "You've successfully registered!" (disappears after).
                 navigate("/login");
@@ -124,6 +131,7 @@ export default function RegisterPage() {
                     </div>
                 )}
 
+                {/* The core Registration form: */}
                 <form
                     onSubmit={handleSubmit}
                     style={{
