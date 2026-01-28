@@ -1,9 +1,39 @@
 import NavBar from "../components/NavBar";
 
+/* 2026-01-28-NOTE: Adding authorization context to About Page to alter how this page is loaded
+depending on if the user is logged in or not. I want the About Page to be viewable from the Login/Register page
+(meaning the user hasn't yet logged in or doesn't yet have an account). The About Page certainly should not be gated! 
+---
+- I'm going to hide the Navigation Bar behind Access Token check.
+- I'm going to replace it with a "Return to Login/Registration Page" bar or button instead!
+*/
+import { useAuth } from "../utility/auth/AuthContext";
+import { Link } from "react-router-dom";
+
 export default function AboutPage() {
+  const { accessToken } = useAuth();
+
   return (
     <div>
-      <NavBar />
+
+      {/* If the user is viewing the About Page in an authorized context, navigation bar appears. */}
+      {accessToken && (<NavBar />)}
+      {/* If the user is not authenticated, navigation bar would be replaced with a similar bar re-directing to the Auth pages: */}
+      {!accessToken && (
+        <div className="navBar">
+          <nav className="navContainer">
+            <div className="navLeft">
+              <Link to="/login" className="navLink">
+                Login
+              </Link>
+              <Link to="/register" className="navLink">
+                Register
+              </Link>
+            </div>
+          </nav>
+        </div>
+      )}
+
       <div
         style={{
           fontFamily: "monospace",

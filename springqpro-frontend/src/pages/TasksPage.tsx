@@ -1,15 +1,30 @@
+/* TasksPage.tsx:
+-----------------
+Originally the part of the frontend that interacted with Tasks — creating, mutating, and querying them for observability — was
+going to be concentrated in a single page. Granted, it is the core feature of my SpringQueuePro backend so, with added thought,
+I want to make the two core aspects of it (actual Task creation and enqueue process + observability and inspection) its own "section"
+because both areas can get rather detailed. i've split the former to this file (TasksPage.tsx) and the latter TaskDashboardPage.tsx.
+- TasksPage.tsx = Producer console.
+- TaskDashboardPage.tsx = Monitoring Dashboard
+Recall that any Job/Task Queue is just an implementation of the Producer-Consumer model — this is here our Producer interface.
+***
+This page focuses on submitting Tasks into the system and giving lightweight, immediate observability (where more detailed
+observability and minute-detail inspection can be performed in TaskDashboardPage.tsx).
+***
+Immediate Observability:
+- View recent tasks
+- Expose just enough metrics to get a sense of what's being tracked.
+-----------------
+TL;DR: TasksPage is a producer UI and light observability console.
+It submits work, shows immediate effects, and delegates deep inspection elsewhere.
+*/
+
 import { useRef, useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
 import { API_BASE, getEnumLists } from "../api/api";
 import { useAuth } from "../utility/auth/AuthContext";
 
-/* NOTE:+TO-DO:
-- I WANT TO ADD A "CLEAR" BUTTON FOR THE MOST RECENT TASKS BUT THE PROBLEM IS THAT EVERYTIME
-IT RE-LOADS THE WHOLE THING COMES BACK ANYWAYS!!!
-*/
-
-/* -------------------- Types (auto-shaped dynamically) -------------------- */
-
+// Types - auto-shaped dynamically:
 type TaskType = string;
 type TaskStatus = string;
 
@@ -21,58 +36,54 @@ interface Task {
   attempts: number;
   maxRetries: number;
   createdAt: string;
-}
+} // Documents backend GraphQL output.
 
 interface MetricResponse {
   name: string;
   measurements: { statistic: string; value: number }[];
   availableTags: any[];
-}
+} // Purely for typing Actuator responses.
 
-/* ============================= MAIN COMPONENT ============================= */
-
+// Main component:
 export default function TasksPage() {
-  const { accessToken } = useAuth();
+  const { accessToken } = useAuth();  // GraphQL endpoints are JWT-secured; TasksPage cannot function w/o auth (valid access token).
 
-  /* -------------------- Dynamic Enum Lists -------------------- */
+  // State buckets (NOTE: #3 onwards is purely cosmetic and for educative purposes):
+  // 1. Dynamic Enum Lists (GraphQL schema introspection):
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
-  //const [taskStatuses, setTaskStatuses] = useState<TaskStatus[]>([]);
   const [enumsLoaded, setEnumsLoaded] = useState(false);
 
-  /* -------------------- Create Form State -------------------- */
+  // 2. Task Creation Form State:
   const [payload, setPayload] = useState("");
   const [taskType, setTaskType] = useState<TaskType>("");
   const [creating, setCreating] = useState(false);
-  //const [createError, setCreateError] = useState<string | null>(null);
 
-  /* -------------------- GraphQL Output State -------------------- */
+  // 3. GraphQL Output State:
   const [lastMutationPreview, setLastMutationPreview] = useState("");
   const [lastResponseJson, setLastResponseJson] = useState("");
 
-  /* -------------------- Recent Tasks -------------------- */
+  // 4. Recent Tasks:
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
 
-  // 2025-12-05-NOTE: New state to keep track of Tasks in the "Recent Tasks" tab that the current user actually made:
-  //const [myOwnedTaskIds, setMyOwnedTaskIds] = useState<Set<string>>(new Set());
-
-  /* -------------------- Metrics -------------------- */
+  // 5. Metrics Snapshot:
   const [submittedCount, setSubmittedCount] = useState<number | null>(null);
   const [completedCount, setCompletedCount] = useState<number | null>(null);
   const [failedCount, setFailedCount] = useState<number | null>(null);
   const [queueSize, setQueueSize] = useState<number | null>(null);
 
+  // React Refs:
   const lastCreatedIdRef = useRef<string | null>(null);
 
-  /* -------------------- Load Enum Lists (taskEnums) -------------------- */
+  // ---------------------------------------------------------------------------
 
+  // Async function to load enum lists + UseEffect hook to invoke it when accessToken state is set:
   const loadEnumLists = async () => {
     if (!accessToken) return;
 
     try {
       const enums = await getEnumLists(accessToken);
       setTaskTypes(enums.taskTypes);
-      //setTaskStatuses(enums.taskStatuses);
 
       // preselect first available type
       if (enums.taskTypes.length > 0) {
@@ -84,14 +95,13 @@ export default function TasksPage() {
       console.error("Failed to load GraphQL enum lists:", err);
       setEnumsLoaded(false);
     }
-  };
+  };  // When you're creating Task, there's a "Select Type" drop-down, this list will populate that drop-down selection.
 
   useEffect(() => {
     loadEnumLists();
   }, [accessToken]);
-
-  /* -------------------- GraphQL Caller -------------------- */
-
+  
+  // Function for calling GraphQL (single endpoint /graphql, takes in string representing query and variables):
   const callGraphQL = async (query: string, variables?: any) => {
     if (!accessToken) throw new Error("Missing access token");
 
@@ -99,7 +109,7 @@ export default function TasksPage() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`, // inject auth
       },
       body: JSON.stringify({ query, variables }),
     });
@@ -112,18 +122,14 @@ export default function TasksPage() {
     return res.json();
   };
 
-  /* -------------------- Create Task -------------------- */
-
+  // Create Task function (core functionality):
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!payload.trim()) {
-      //setCreateError("Please enter a payload.");
       return;
     }
-
     setCreating(true);
-    //setCreateError(null);
 
     const mutation = `
       mutation CreateTask($input: CreateTaskInput!) {
@@ -136,8 +142,7 @@ export default function TasksPage() {
           maxRetries
           createdAt
         }
-      }
-    `;
+      }`;
 
     const variables = {
       input: {
@@ -148,21 +153,21 @@ export default function TasksPage() {
 
     // Pretty preview block
     const preview = `
-    mutation {
-      createTask(input: {
-        payload: "${payload}",
-        type: ${taskType}
-      }) {
-        id
-        payload
-        type
-        status
-        attempts
-        maxRetries
-        createdAt
+      mutation {
+        createTask(input: {
+          payload: "${payload}",
+          type: ${taskType}
+        }) {
+          id
+          payload
+          type
+          status
+          attempts
+          maxRetries
+          createdAt
+        }
       }
-    }
-    `.trim();
+        `.trim();
 
     setLastMutationPreview(preview);
 
@@ -214,8 +219,7 @@ export default function TasksPage() {
     }
   };
 
-  /* -------------------- Recent Tasks Fetch -------------------- */
-
+  // Function to fetch Recent Tasks:
   const fetchRecentTasks = async () => {
     if (!accessToken) return;
 
@@ -252,14 +256,14 @@ export default function TasksPage() {
     }
   };
 
+  // UseEffect hook to set polling interval for Recent Tasks panel when accessToken is set:
   useEffect(() => {
     fetchRecentTasks();
     const interval = setInterval(fetchRecentTasks, 3000);
     return () => clearInterval(interval);
   }, [accessToken]);
 
-  /* -------------------- Retry Button -------------------- */
-
+  // Function for retrying tasks that fail:
   const handleRetryTask = async (task: Task) => {
     const mutation = `
       mutation($id: ID!) {
@@ -282,8 +286,7 @@ export default function TasksPage() {
     }
   };
 
-  /* -------------------- Metrics -------------------- */
-
+  // -------------------- Metrics-related functions: --------------------
   const fetchMetric = async (key: string): Promise<number | null> => {
     try {
       const res = await fetch(`${API_BASE}/actuator/metrics/${key}`, {
@@ -310,15 +313,14 @@ export default function TasksPage() {
     setFailedCount(failed);
     setQueueSize(queue);
   };
-
+  // Similar idea with the polling as to the Recent Tasks panel:
   useEffect(() => {
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 5000);
     return () => clearInterval(interval);
   }, [accessToken]);
 
-  /* -------------------- Status Color Helper -------------------- */
-
+  // Cosmetic Task STATUS colour config:
   const statusColor = (status: TaskStatus): string => {
     switch (status) {
       case "QUEUED":
@@ -334,8 +336,7 @@ export default function TasksPage() {
     }
   };
 
-  /* ============================= RENDER ============================= */
-
+  // RENDER:
   return (
     <div
       style={{
@@ -473,7 +474,7 @@ export default function TasksPage() {
                   overflowX: "auto",
                 }}
               >
-{lastMutationPreview || "// Fill the form and click Create Task to see your GraphQL mutation here"}
+                {lastMutationPreview || "// Fill the form and click Create Task to see your GraphQL mutation here"}
               </pre>
 
               <div style={{ 
@@ -508,7 +509,7 @@ export default function TasksPage() {
                   overflowX: "auto",
                 }}
               >
-{lastResponseJson || "// Response from SpringQueuePro will appear here"}
+                {lastResponseJson || "// Response from SpringQueuePro will appear here"}
               </pre>
             </div>
           </div>

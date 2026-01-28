@@ -278,6 +278,20 @@ export default function RegisterPage() {
                         Sign in →
                     </Link>
                 </div>
+
+                <div>
+                    Go to{" "}
+                    <Link
+                        to="/about"
+                        style={{
+                        textDecoration: "none",
+                        color: "#6db33f",
+                        fontWeight: "bold",
+                    }}>
+                        About Page
+                    </Link>
+                </div>
+
             </div>
         </div>
     );

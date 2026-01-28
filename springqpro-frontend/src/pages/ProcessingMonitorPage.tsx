@@ -1,3 +1,7 @@
+/* ProcessingMonitorPage.tsx:
+-----------------------------
+This is a live operational runtime monitor.
+*/
 import { useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
 import { useAuth } from "../utility/auth/AuthContext";

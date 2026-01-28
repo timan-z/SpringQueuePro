@@ -1,11 +1,25 @@
+/* TaskDashboardPage.tsx:
+-------------------------
+[Worth taking a look at the comment at the top of TasksPage.tsx for more context].
+***
+If TasksPage.tsx is the producer console/interface then TasksDashboardPage is the system introspection and control panel.
+This page is for deeper introspection of the "Tasks pool". You can:
+- View all tasks not just recent ones.
+- Filter, search, and inspect tasks.
+- Retry failed tasks and delete existing ones.
+- Run arbitrary safe GraphQL queries (since the whole Task-related API structure is built on GraphQL).
+- Inspect the fine details of any single Task (see TaskDetailDrawer.tsx for implementation specifics).
+***
+TasksDashboardPage is heavier, slower, but more powerful than the observability offered in TasksPage. Hence separation of concerns.
+*/
+
 import { useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
 import TaskDetailDrawer from "../components/TaskDetailDrawer";
 import { API_BASE, getEnumLists } from "../api/api";
 import { useAuth } from "../utility/auth/AuthContext";
 
-/* -------------------- Types -------------------- */
-
+// Types:
 type TaskType = string;
 type Status = string;
 
@@ -19,54 +33,58 @@ interface Task {
   createdAt: string;
 }
 
-/* ============================================================
-                      TASKS DASHBOARD PAGE
-   ============================================================ */
+// Main component:
 export default function TasksDashboardPage() {
-  const { accessToken } = useAuth();
+  const { accessToken } = useAuth();    // GraphQL endpoints are JWT-secured; TaskDashboardPage.tsx cannot function w/o auth (valid access token).
 
-  /* ---------- Dynamic Enums from Schema ---------- */
+  // State buckets:
+  // 1. Dynamic Enum Lists (GraphQL schema introspection):
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [taskStatuses, setTaskStatuses] = useState<Status[]>([]);
   const [enumsLoaded, setEnumsLoaded] = useState(false);
 
-  /* ---------- Data ---------- */
+  // 2. Core Data:
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
 
-  /* ---------- Filters ---------- */
+  // 3. Filters:
   const [statusFilter, setStatusFilter] = useState<Status | "ALL">("ALL");
   const [typeFilter, setTypeFilter] = useState<TaskType | "ALL">("ALL");
   const [searchId, setSearchId] = useState("");
 
-  /* ---------- Sorting ---------- */
-  const [sortKey, setSortKey] = useState<keyof Task>("createdAt");
-  const [sortAsc, setSortAsc] = useState(false);
+  // 4. Sorting:
+  /* 2026-01-27-NOTE: In hindsight, I haven't actually exposed any complex sorting controls yet so state vars aren't really needed.
+  but I'll keep them commented out for future extensibility. */
+  const sortKey: keyof Task = "createdAt";
+  const sortAsc = false;
+  //const [sortKey, setSortKey] = useState<keyof Task>("createdAt");
+  //const [sortAsc, setSortAsc] = useState(false);
 
-  /* ---------- GraphQL Explorer ---------- */
+  // 5. GraphQL Query-Related:
+  // NOTE: This is more of a sandbox uncoupled from the rest of the page. It's "unsafe" in practice but scoped (and again for demo cosmetic purposes). 
   const [gqlQuery, setGqlQuery] = useState(`
-{
-  tasks {
-    id
-    payload
-    type
-    status
-    attempts
-    maxRetries
-    createdAt
+  {
+    tasks {
+      id
+      payload
+      type
+      status
+      attempts
+      maxRetries
+      createdAt
+    }
   }
-}
-  `.trim());
+    `.trim());
   const [gqlResult, setGqlResult] = useState("");
 
-  /* ---------- Drawer ---------- */
+  // 6. Task Drawer-Related:
   const [drawerTask, setDrawerTask] = useState<Task | null>(null);
   const [drawerQuery, setDrawerQuery] = useState("");
+  
+  // 7. Misc:
+  const [autoRefresh, setAutoRefresh] = useState(true); // Let the user toggle auto-polling on and off.
 
-  /* ---------- Auto-refresh ---------- */
-  const [autoRefresh, setAutoRefresh] = useState(true);
-
-  /* -------------------- Generic GQL Caller -------------------- */
+  // Function for calling GraphQL (single endpoint /graphql, takes in string representing query and variables):
   const gql = async (query: string, variables?: any) => {
     const res = await fetch(`${API_BASE}/graphql`, {
       method: "POST",
@@ -79,9 +97,7 @@ export default function TasksDashboardPage() {
     return res.json();
   };
 
-  /* ============================================================
-                      Load Enum Lists (Dynamic)
-     ============================================================ */
+  // Function to load Enum lists followed by UseEffect hook that invokes it upon accessToken load:
   const loadEnumLists = async () => {
     if (!accessToken) return;
     try {
@@ -98,9 +114,7 @@ export default function TasksDashboardPage() {
     loadEnumLists();
   }, [accessToken]);
 
-  /* ============================================================
-                          Fetch ALL tasks
-     ============================================================ */
+  // Function for fetching all Tasks followed by a UseEffect hook that invokes it when Tasks load:
   const loadTasks = async () => {
     if (!accessToken) return;
 
@@ -129,7 +143,7 @@ export default function TasksDashboardPage() {
     loadTasks();
   }, []);
 
-  /* Auto-refresh toggle */
+  // When Auto-Refresh is "on", set the polling interval:
   useEffect(() => {
     if (!autoRefresh) return;
 
@@ -137,9 +151,7 @@ export default function TasksDashboardPage() {
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  /* ============================================================
-                      Retry / Delete Tasks
-     ============================================================ */
+  // Function for retrying tasks:
   const retryTask = async (task: Task) => {
     const mutation = `
       mutation Retry($input: StdUpdateTaskInput!) {
@@ -158,6 +170,7 @@ export default function TasksDashboardPage() {
     loadTasks();
   };
 
+  // Function for deleting tasks:
   const deleteTask = async (task: Task) => {
     const mutation = `
       mutation DeleteTask($id: ID!) {
@@ -168,17 +181,13 @@ export default function TasksDashboardPage() {
     loadTasks();
   };
 
-  /* ============================================================
-                      GraphQL Explorer: Run Query
-     ============================================================ */
+  // In the GraphQL Explorer panel, function for running/initiating the configured query:
   const runExplorer = async () => {
     const json = await gql(gqlQuery);
     setGqlResult(JSON.stringify(json, null, 2));
   };
 
-  /* ============================================================
-                      Apply Filters + Sorting + Search
-     ============================================================ */
+  // Filters for searching and sorting (kind of made my sortAsc etc variables redundant admittedly): 
   const tasksView = [...tasks]
     .filter((t) => (statusFilter === "ALL" ? true : t.status === statusFilter))
     .filter((t) => (typeFilter === "ALL" ? true : t.type === typeFilter))
@@ -190,11 +199,9 @@ export default function TasksDashboardPage() {
       const bVal = (b as any)[sortKey];
       if (sortAsc) return aVal > bVal ? 1 : -1;
       return aVal < bVal ? 1 : -1;
-    });
+  });
 
-  /* ============================================================
-                      Status Color
-     ============================================================ */
+  // Status colours:
   const statusColor = (s: Status) =>
     s === "COMPLETED"
       ? "#2f9e44"
@@ -204,9 +211,21 @@ export default function TasksDashboardPage() {
       ? "#2f8faf"
       : "#d9a441";
 
-  /* ============================================================
-                           RENDER
-     ============================================================ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // RENDER:
   return (
     <div style={{ backgroundColor: "#f6f8fa", minHeight: "100vh" }}>
       <NavBar />
@@ -247,7 +266,7 @@ export default function TasksDashboardPage() {
           >
             <h2 style={{ marginTop: 0, color: "#6db33f" }}>All Tasks</h2>
 
-            {/* ----- FILTERS ----- */}
+            {/* Filter: */}
             <div
               style={{
                 display: "flex",
@@ -259,6 +278,7 @@ export default function TasksDashboardPage() {
               {/* Status Filter */}
               <select
                 value={statusFilter}
+                disabled={!enumsLoaded}
                 onChange={(e) =>
                   setStatusFilter(e.target.value as Status | "ALL")
                 }
@@ -270,7 +290,12 @@ export default function TasksDashboardPage() {
                 }}
               >
                 <option value="ALL">All Statuses</option>
-                {taskStatuses.map((s) => (
+
+                {!enumsLoaded && (
+                  <option disabled>Loading statuses...</option>
+                )}
+
+                {enumsLoaded && taskStatuses.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -280,6 +305,7 @@ export default function TasksDashboardPage() {
               {/* Type Filter */}
               <select
                 value={typeFilter}
+                disabled={!enumsLoaded}
                 onChange={(e) =>
                   setTypeFilter(e.target.value as TaskType | "ALL")
                 }
@@ -291,7 +317,12 @@ export default function TasksDashboardPage() {
                 }}
               >
                 <option value="ALL">All Types</option>
-                {taskTypes.map((t) => (
+
+                {!enumsLoaded && (
+                  <option disabled>Loading types...</option>
+                )}
+
+                {enumsLoaded && taskTypes.map((t) => (
                   <option key={t} value={t}>
                     {t}
                   </option>
@@ -491,7 +522,7 @@ export default function TasksDashboardPage() {
                 borderRadius: "6px",
               }}
             >
-{gqlResult || "// Results appear here"}
+              {gqlResult || "// Results appear here"}
             </pre>
           </div>
         </div>

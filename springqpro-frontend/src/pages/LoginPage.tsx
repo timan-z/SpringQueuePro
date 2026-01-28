@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { loginUser } from "../api/api.ts";
 import { useAuth } from "../utility/auth/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
     // React Refs:
@@ -186,6 +186,20 @@ export default function LoginPage() {
                         Create an account →
                     </a>
                 </div>
+
+                <div>
+                    Go to{" "}
+                    <Link
+                        to="/about"
+                        style={{
+                        textDecoration: "none",
+                        color: "#6db33f",
+                        fontWeight: "bold",
+                    }}>
+                        About Page
+                    </Link>
+                </div>
+
             </div>
         </div>
     );

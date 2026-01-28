@@ -1,9 +1,14 @@
-// Just a modular panel that'll contain Task detail when you click a specific Task on the Tasks/Task Dashboard Page.
-/* This wil slide in from the right-hand side of the screen, show the full task JSON, show the GraphQL query
-used to fetch it, and includes a close button.
+/* TaskDetailDrawer.tsx:
+------------------------
+This is just an external modular panel in which specific Task details will be displayed when you click on a specific
+Task in the Task Dashboard page (TaskDashboardPage.tsx). It'll slide in from the right-hand side of the screen, show
+the full task JSON, show the GraphQL query used to fetch it, and include a close button.
+------------------------
+TL;DR: It is a stateless, presentational UI overlay. This is just a cosmetic "drawer" component.
 */
+
 interface TaskDetailDrawerProps {
-  task: any | null;
+  task: any | null; // <-- NOTE: I can maybe tighten this to be an explicit Task interface eventually. This is probably bad TypeScript practice.
   graphqlQuery: string;
   onClose: () => void;
 }
@@ -61,7 +66,7 @@ export default function TaskDetailDrawer({
           overflowX: "auto",
         }}
       >
-{graphqlQuery}
+        {graphqlQuery}
       </pre>
 
       <h4 style={{ marginTop: "20px" }}>Task JSON</h4>
@@ -74,7 +79,7 @@ export default function TaskDetailDrawer({
           overflowX: "auto",
         }}
       >
-{JSON.stringify(task, null, 2)}
+        {JSON.stringify(task, null, 2)}
       </pre>
     </div>
   );
