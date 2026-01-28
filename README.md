@@ -40,7 +40,7 @@
 ## Key Features
 - Distributed task processing with durable persistence (PostgreSQL)
 - Redis-backed distributed locking to prevent double execution (race conditions).
-- Atomic task state transitions (**QUEUED → IN_PROGRESS → COMPLETED / FAILED**)
+- Atomic task state transitions (**QUEUED → INPROGRESS → COMPLETED / FAILED**)
 - Automatic retries with exponential backoff
 - Pluggable TaskHandler registry for extensible job logic
 - JWT authentication with access + refresh tokens and rotation
@@ -58,7 +58,7 @@ At a high level, the SpringQueuePro system is comprised of:
 
 - **Persistence Layer (PostgreSQL)**  
   Acts as the system of record for all tasks. Each task follows a strict lifecycle
-  (**QUEUED → IN_PROGRESS → COMPLETED / FAILED**) enforced via atomic state transitions to prevent race conditions and duplicate execution.
+  (**QUEUED → INPROGRESS → COMPLETED / FAILED**) enforced via atomic state transitions to prevent race conditions and duplicate execution.
 
 - **Distributed Coordination Layer (Redis)**  
   Provides distributed locks and ephemeral coordination primitives. Redis-backed locks ensure that only one worker may claim and process a task at a time, even under concurrent execution. (*The traditiional caching "fast-lookup" utility of Redis is—of course—used too, but this is its most significant purpose*).
@@ -141,10 +141,10 @@ stateDiagram-v2
     INPROGRESS --> FAILED: handler.throw / exception
 
     FAILED --> QUEUED: attempts < maxRetries<br/>schedule retry (backoff)
-    FAILED --> RETIRED: attempts >= maxRetries
+    FAILED --> FAILED: attempts >= maxRetries
 
     COMPLETED --> [*]
-    RETIRED --> [*]
+    FAILED --> [*]
 ```
 
 ### Task Lifecycle Step-by-Step
@@ -157,15 +157,17 @@ Metrics emitted:
 - `springqpro_tasks_submitted_manually_total`
 
 ### 2. Task Claiming
-Workers asynchronously attempt to claim queued tasks. A worker performs an atomic state transition:
+Workers asynchronously attempt to claim queued tasks.
 
-`QUEUED → IN_PROGRESS`
+A worker first performs an **atomic database transition**:
 
-This operation is guarded by:
-- a transactional database update
-- a Redis-backed distributed lock
+`QUEUED → INPROGRESS`
 
-If either fails, the task is skipped and retried later.
+This transition is the **authoritative claim** and succeeds only if the task is still in the expected state. If the update affects zero rows, another worker has already claimed the task.
+
+After a successful database claim, the worker attempts to acquire a **Redis-backed distributed lock** to coordinate execution across threads or nodes.
+
+If the Redis lock cannot be acquired, the task is safely returned to `QUEUED` so that another worker may process it later.
 
 Metrics emitted:
 - `springqpro_tasks_claimed_total`
@@ -256,7 +258,7 @@ public class TaskEntity {
 - **Strict Lifecycle Enforcement**:   
   Tasks transition only through controlled state changes:
   ```
-  QUEUED → IN_PROGRESS → COMPLETED / FAILED → (RETRY or RETIRED)
+  QUEUED → INPROGRESS → COMPLETED / FAILED → (RETRY or FAILED)
   ``` 
 `TaskEntity` is treated as the **authoritative system-of-record**, and all concurrency control (claims, retries, requeueing) ultimately resolves to safe database state transitions.
 
@@ -323,6 +325,9 @@ The mapper ensures that only relevant fields flow into business logic, execution
   ```java
   int updated = taskRepository.transitionStatus(taskId, TaskStatus.QUEUED, TaskStatus.INPROGRESS, current.getAttempts() + 1);
   ```
+  > The database transition is the *true ownership boundary*.
+  > Redis locking is applied **after claiming** to coordinate safe execution, not to decide task ownership.
+
 3. **Distributed Lock Acquisition**:  
   Use Redis to ensure that only one worker processes the task across threads or nodes.
   ```java
@@ -409,8 +414,8 @@ You might wonder why tasks are enqueued by their **Task ID** instead of passing 
 **ProcessingService** is the *central orchestrator* responsible for enforcing correctness and reliability guarantees. It owns the entire execution lifecycle of a task:
 
 1. **Atomically claims** a task in PostgreSQL
-   (`QUEUED → IN_PROGRESS`, attempts incremented in a single transaction)
-2. **Acquires a Redis-backed distributed lock** to prevent concurrent execution
+   (authoritative ownership, `QUEUED → INPROGRESS`, attempts incremented in a single transaction)
+2. **Attempts Redis lock acquisition** for execution coordination
 3. **Maps persistence → domain models** (`TaskEntity → Task`)
 4. **Routes execution** to a pluggable `TaskHandler`
 5. **Persists final state** (`COMPLETED` or `FAILED`)
@@ -419,15 +424,16 @@ You might wonder why tasks are enqueued by their **Task ID** instead of passing 
 ```java
 public void claimAndProcess(String taskId) {
     /* NOTE: Not actually representative of ProcessingService's claimAndProcess(...) method, more an extremely simplified outline of its core operations (it would be too much code bloat to add here). */
+    TaskEntity claimed = taskRepository.claimForProcessing(taskId).orElse(null);
+    if (claimed == null) return;
     String lockKey = "task:" + taskId;
     String token = lock.tryLock(lockKey, 2000);
-    if (token == null) return;
+    if (token == null) {
+        taskRepository.transitionStatus(taskId, INPROGRESS, QUEUED);
+        return;
+    }
 
     try {
-        TaskEntity claimed = taskRepository.claimForProcessing(taskId)
-                .orElse(null);
-        if (claimed == null) return;
-
         Task task = taskMapper.toDomain(claimed);
 
         TaskHandler handler = handlerRegistry.getHandler(task.getType().name());
@@ -531,11 +537,11 @@ All durable task state remains in PostgreSQL; Redis is treated as a **fast, disp
 And:
 > Redis is used deliberately for *coordination, not correctness*—a design choice that mirrors real-world distributed systems like Celery, BullMQ, and cloud queue workers.
 
+**NOTE**:
+> Redis locks do **not** determine which worker owns a task.
+> Ownership is decided by the database claim; Redis only prevents overlapping execution.
+
 ---
-
-
-
-
 
 ## 4. Automatic Retries with Exponential Backoff
 
@@ -697,7 +703,7 @@ This keeps handlers:
 
 This Retry architecture ensures:
 
-- **Exactly-once-or-safe-failure semantics**
+- **Exactly-once per successful claim, or safe failure**
   A task is either completed once or retired after bounded retries.
 
 - **No retry storms**
@@ -731,6 +737,7 @@ type Task {
   attempts: Int!
   maxRetries: Int!
   createdAt: String!
+  createdBy: String!
 }
 
 enum TaskStatus { QUEUED INPROGRESS COMPLETED FAILED }
@@ -764,13 +771,16 @@ input StdUpdateTaskInput {
 
 type Query {
   tasks(status: TaskStatus): [Task!]!
+  tasksType(type: TaskType): [Task!]!
   task(id: ID!): Task
+  taskEnums: TaskEnums!
 }
 
 type Mutation {
   createTask(input: CreateTaskInput!): Task!
   updateTask(input: StdUpdateTaskInput!): Task
   deleteTask(id: ID!): Boolean!
+  retryTask(id: ID!): Boolean!
 }
 ```
 ---
@@ -958,9 +968,9 @@ sequenceDiagram
     TS->>QS: enqueueById(taskId)
     QS->>Exec: submit(taskId)
     Exec->>PS: claimAndProcess(taskId)
+    PS->>DB: SELECT + atomic transition QUEUED->INPROGRESS
     PS->>R: tryLock("task:taskId")
     R-->>PS: lock token
-    PS->>DB: SELECT + atomic transition QUEUED->INPROGRESS
     PS->>Handlers: handler.handle(Task)
     alt success
         PS->>DB: UPDATE status=COMPLETED
@@ -982,7 +992,7 @@ Authentication is implemented using **short-lived access tokens** and **rotating
 **Core components:**
 
 - **Access Tokens**
-  - Short-lived JWTs (minutes)
+  - Short-lived JWTs (configured per environment: dev longer for testing, prod ~15 but not concrete)
   - Sent on every request via `Authorization: Bearer <token>`
   - Used exclusively for API authentication
   - Rejected if expired, malformed, or incorrectly typed
@@ -1164,16 +1174,14 @@ sequenceDiagram
 sequenceDiagram
     participant UI as Client
     participant Auth as /auth/refresh
-    participant RTS as RefreshTokenService
     participant Redis as RedisTokenStore
 
     UI->>Auth: POST /auth/refresh { refreshToken }
-    Auth->>RTS: validateAndRotate(refreshToken)
-    RTS->>Redis: lookup refresh token
-    Redis-->>RTS: token data (user, valid?)
-    RTS->>Redis: invalidate old token
-    RTS->>Redis: store new refresh token
-    RTS-->>Auth: new access + refresh tokens
+    Auth->>Redis: validateAndRotate(refreshToken)
+    Redis->>Redis: lookup refresh token
+    Redis->>Redis: invalidate old token
+    Redis->>Redis: store new refresh token
+    Redis-->>Auth: new access + refresh tokens
     Auth-->>UI: { accessToken, refreshToken }
 ```
 
@@ -1183,32 +1191,33 @@ sequenceDiagram
 
 SpringQueuePro is heavily instrumented with Micrometer:
 
-* **Custom counters/timers** registered in a `ProcessingMetricsConfig`:
+- **Custom counters/timers** registered in a `ProcessingMetricsConfig`:
 
-  * `springqpro_tasks_submitted_total`
-  * `springqpro_tasks_claimed_total`
-  * `springqpro_tasks_completed_total`
-  * `springqpro_tasks_failed_total`
-  * `springqpro_tasks_retried_total`
-  * `springqpro_queue_enqueue_total`
-  * `springqpro_queue_enqueue_by_id_total`
-  * `springqpro_queue_memory_size`
-  * `springqpro_task_processing_duration` (Timer/Histogram)
-  * `springqpro_tasks_submitted_manually_total` (for user-initiated tasks via GraphQL/REST)
+  - `springqpro_tasks_submitted_total`
+  - `springqpro_tasks_claimed_total`
+  - `springqpro_tasks_completed_total`
+  - `springqpro_tasks_failed_total`
+  - `springqpro_tasks_retried_total`
+  - `springqpro_queue_enqueue_by_id_total`
+  - `springqpro_api_task_create_total`
+  - `springqpro_task_processing_duration` (Timer/Histogram)
 
 These are incremented in strategic points like:
 
-* When a task is created (`TaskService.createTask`).
-* When ProcessingService successfully claims a task.
-* When a task completes, fails, or is scheduled for retry.
-* When QueueService enqueues a task (by id or legacy in-memory).
+- When a task is created via the GraphQL API (`springqpro_api_task_create_total`).
+- When the runtime processing pipeline begins and a task is submitted for execution (`springqpro_tasks_submitted_total`).
+- When `ProcessingService` successfully claims a task (`springqpro_tasks_claimed_total`).
+- When a task completes, fails, or is scheduled for retry.
+- When `QueueService.enqueueById(...)` feeds work into the orchestration layer (`springqpro_queue_enqueue_by_id_total`).
 
 Exposed through:
 
-* `GET /actuator/metrics` – JSON endpoint for individual metrics.
-* `GET /actuator/prometheus` – Prometheus scrape endpoint with all metrics.
+- `GET /actuator/metrics` – JSON endpoint for individual metrics.
+- `GET /actuator/prometheus` – Prometheus scrape endpoint with all metrics.
 
 This allows easy integration with Prometheus + **soon-to-come** Grafana dashboards (*leaving this section intentionally short since these metrics were intended for a larger Grafana section*).
+
+> NOTE: Legacy in-memory queue metrics (like `springqpro_queue_enqueue_total` and `springqpro_queue_memory_size`) were intentionally removed once the system became persistence-driven, and to avoid keeping deprecated in-memory structures alive just for instrumentation.
 
 ---
 
