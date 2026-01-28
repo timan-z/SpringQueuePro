@@ -1,12 +1,16 @@
 /* SystemHealthPage.tsx:
 ------------------------
-
-
+This page is a "platform-level" health dashboard, not a queue dashboard the way ProcessingMonitorPage is.
+It answers system internal questions like if the application is even live and running, if the necessary
+subsystems (PostgreSQL and Redis) are active, and if core system metrics are working as intended.
+***
+- ProcessingMonitorPage: Runtime behavior of the queue.
+- SystemHealthPage: Infrastructure and service health.
 */
 import { useEffect, useState } from "react";
 import NavBar from "../components/NavBar";
 import { useAuth } from "../utility/auth/AuthContext";
-import { getSystemHealth, getSystemMetric } from "../api/api";
+import { getSystemHealth, getSystemMetric } from "../api/api";  // Core system-specific metrics.
 
 interface HealthComponent {
   status: string;
@@ -20,16 +24,17 @@ interface HealthResponse {
 export default function SystemHealthPage() {
   const { accessToken } = useAuth();
 
+  // Health Payload:
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
-
+  // Metrics snapshot (mirror metrics shown elsewhere):
   const [queueDepth, setQueueDepth] = useState<number | null>(null);
   const [completed, setCompleted] = useState<number | null>(null);
   const [failed, setFailed] = useState<number | null>(null);
 
+  // Orchestration and UseEffect hook that polls it:
   const fetchAll = async () => {
     if (!accessToken) return;
-
     setLoading(true);
 
     const h = await getSystemHealth(accessToken);
@@ -53,9 +58,7 @@ export default function SystemHealthPage() {
     return () => clearInterval(id);
   }, [accessToken]);
 
-  // -------------------------------------------------
-  // Styles
-  // -------------------------------------------------
+  // In-line style(s): <-- TO-DO: Maybe not the best practice, fix?
   const card: React.CSSProperties = {
     background: "#fff",
     border: "2px solid #6db33f",

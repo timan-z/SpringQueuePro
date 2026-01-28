@@ -1,0 +1,200 @@
+# Frontend Overview
+
+The SpringQueuePro frontend is a **React + TypeScript dashboard** designed to surface the internal behavior of a production-grade task processing system in a clear, observable, and recruiter-friendly way. Rather than acting as a generic CRUD UI (like the interfaces for my SpringQueue (base) and GoQueue projects), each page highlights a specific system concern: authentication, task lifecycle, processing behavior, and operational health.
+
+---
+
+## Authentication & Application Shell
+
+### **AuthContext.tsx**
+
+This file is the **core of the frontend authentication system**.
+
+`AuthContext` centralizes:
+
+* JWT access + refresh token storage
+* Session restoration on page reload
+* Automatic access token refresh
+* Logout and refresh token invalidation
+* A shared authentication contract (`useAuth`) for the entire app
+
+By wrapping the application in `AuthProvider`, authentication state and logic are **defined once** and consumed everywhere, avoiding prop drilling and duplicated token logic. This design also makes route protection and API authorization predictable and robust.
+
+---
+
+### **ProtectedRoute.tsx**
+
+A lightweight route guard that:
+
+* Blocks access to protected pages if the user is not authenticated
+* Redirects unauthenticated users to the login flow
+
+This ensures the dashboard reflects real-world authorization boundaries.
+
+---
+
+### **App.tsx**
+
+Defines the application’s routing structure and access model:
+
+* Public routes (Login, Register, About)
+* Protected routes (Tasks, Dashboards, Metrics, Processing)
+* A default route that redirects users based on authentication state
+
+It acts as the **entry point and security boundary** for the frontend.
+
+---
+
+### **NavBar.tsx**
+
+The primary navigation surface for authenticated users.
+It provides quick access to all operational dashboards and reflects the authenticated state of the application.
+
+---
+
+## Authentication Entry & Visibility
+
+### **LoginPage.tsx**
+
+Handles user authentication and session initiation.
+On successful login, users are redirected into the authenticated dashboard flow. It also provides a public link to the About page for unauthenticated visitors.
+
+---
+
+### **RegisterPage.tsx**
+
+Handles account creation and initial onboarding.
+After registration, users are directed back into the login flow. Like the Login page, it allows access to the About page without authentication.
+
+---
+
+### **TokenDashboardPage.tsx**
+
+Provides a **high-level view of the authentication pipeline**, including token presence, expiry, refresh behavior, and overall session state.
+
+This page exists primarily as:
+
+* A transparency and debugging tool
+* A way to showcase JWT-based auth mechanics
+* A visual explanation of how authentication behaves “under the hood”
+
+> **Note on Token Rotation History**
+>
+> This page also includes a small, client-side visualization of refresh token rotation events to help
+> demonstrate how the authentication pipeline behaves in practice (JWT expiry, refresh, and Redis-backed
+> invalidation). This rotation history is **purely diagnostic and cosmetic**, scoped to the current user
+> session, and cleared on logout.
+>
+> It is not security-critical or authoritative, and is intentionally implemented client-side to avoid
+> adding backend complexity for a non-essential observability feature. In a production setting, this could
+> be backed by a user-scoped audit table if long-term persistence were required.
+
+---
+
+## Task Interaction & Observability
+
+### **TasksPage.tsx**
+
+The **task submission interface**.
+
+This page focuses on:
+
+* Creating tasks via GraphQL
+* Selecting valid task types from dynamically loaded enums
+* Viewing the exact GraphQL mutation used
+* Inspecting the backend response
+* Seeing recently created tasks and retrying failures
+
+It intentionally keeps observability minimal, emphasizing **task creation mechanics** rather than system-wide inspection.
+
+---
+
+### **TasksDashboardPage.tsx**
+
+The **deep introspection view** for task lifecycle management.
+
+This page provides:
+
+* A full task table with filtering and search
+* Live task status updates
+* Retry and deletion controls
+* A safe, read-only GraphQL explorer
+* Drill-down inspection via a detail drawer
+
+This dashboard is designed to feel closer to an internal operator or SRE tool than a traditional CRUD interface.
+
+---
+
+### **TaskDetailDrawer.tsx**
+
+A stateless, presentational UI component used by the Tasks Dashboard.
+
+It slides in from the side and displays:
+
+* The GraphQL query used to fetch a task
+* The full task JSON payload
+* A simple close interaction
+
+It contains no business logic and exists purely to support task inspection.
+
+---
+
+## Runtime & Operational Visibility
+
+### **ProcessingMonitorPage.tsx**
+
+Visualizes **live processing behavior** within the system.
+
+This page surfaces:
+
+* Worker pool activity (active, idle, in-flight)
+* Queue depth
+* Completed and failed task counts
+* A rolling stream of processing events
+
+It helps demonstrate concurrency, throughput, and real-time system behavior.
+
+---
+
+### **SystemHealthPage.tsx**
+
+Displays operational health information from Spring Boot Actuator.
+
+This includes:
+
+* Overall system health
+* Component-level status (database, Redis, etc.)
+* Key runtime metrics
+* Periodic polling with manual refresh support
+
+The page exists to showcase **production readiness and observability**, not just application correctness.
+
+---
+
+## Informational Pages
+
+### **AboutPage.tsx**
+
+A public-facing overview of the SpringQueuePro project.
+
+This page:
+
+* Is accessible with or without authentication
+* Adjusts navigation based on auth state
+* Explains system goals, architecture, and capabilities
+* Acts as a portfolio and project summary page
+
+It is intentionally non-operational and informational.
+
+---
+
+## Summary
+
+The frontend is structured to reflect **real production concerns**:
+
+* Authentication and authorization
+* Task submission vs task inspection
+* Processing behavior and concurrency
+* Health, metrics, and observability
+
+Rather than hiding system internals, the UI surfaces them deliberately—making the application both a functional dashboard and a technical demonstration.
